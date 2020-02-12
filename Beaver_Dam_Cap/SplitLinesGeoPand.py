@@ -13,7 +13,7 @@ from shapely.geometry import Point, MultiLineString, LineString
 # from shapely import wkt
 import math
 # import matplotlib.pyplot as plt
-import arcpy
+# import arcpy
 import shutil
 from pathlib import Path
 import glob

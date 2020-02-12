@@ -1,5 +1,5 @@
-from arcpy.sa import *
-import arcpy
+# from arcpy.sa import *
+# import arcpy
 from datetime import datetime
 import os
 import sys

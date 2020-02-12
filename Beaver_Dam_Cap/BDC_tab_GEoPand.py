@@ -32,7 +32,7 @@ import shutil
 # import math
 from shapely.geometry import Point, Polygon, MultiPolygon, LinearRing
 from shapely.ops import cascaded_union
-import arcpy
+# import arcpy
 
 
 ############# START TIME ##############

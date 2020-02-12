@@ -1,10 +1,10 @@
-import Dataset_Prep
-import SplitLinesGeoPand
-import BDC_Terrain_Processing
-import BDC_tab_GEoPand
-import Veg_FIS
-import iHyd
-import Comb_FIS
+from Beaver_Dam_Cap import Dataset_Prep
+# from Beaver_Dam_Cap import SplitLinesGeoPand
+# from Beaver_Dam_Cap import BDC_Terrain_Processing
+# from Beaver_Dam_Cap import BDC_tab_GEoPand
+from Beaver_Dam_Cap import Veg_FIS
+from Beaver_Dam_Cap import iHyd
+from Beaver_Dam_Cap import Comb_FIS
 import os
 
 from datetime import datetime
@@ -32,10 +32,10 @@ def main():
 
     # outRoot = os.path.abspath("D:/HG_Work/GB_Beaver_Data/ENGLAND_BDC_Out") # Need to try again
     # outRoot = os.path.abspath("D:/HG_Work/GB_Beaver_Data/NRW_Severn_Out")
-    outRoot = os.path.abspath("C:/HG_Projects/Hugh_BDC_Files/Alan_BDC/BDC_3060_files")
+    outRoot = os.path.abspath("C:/HG_Projects/Hugh_BDC_Files/new_Version_testing")
     epsg_code = str(27700)
 
-    prep_only = False
+    prep_only = True
     skip_prep = False
 
     if skip_prep is False:
@@ -61,7 +61,7 @@ def main():
                 ocNum = direc[-4:]
                 print("running BDC pipeline for Operational Catchment {0}".format(ocNum))
                 home = os.path.join(outRoot, direc)
-                raw_lines = os.path.join(home, "OC{0}_MM_rivers.shp".format(ocNum))
+                raw_lines = os.path.join(home, "OC{0}_MM_rivers.gpkg".format(ocNum))
 
 
                 split_lines = os.path.join(home, "BDC_reaches.shp")
