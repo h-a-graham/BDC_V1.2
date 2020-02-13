@@ -31,12 +31,13 @@ def BDC_setup_main(rivers_root, dem_path, bvi_etc_root, operCatch, os_gridPath, 
     opCatch_gp.to_crs = ({'init': 'epsg:' + epsg_code})
     print(opCatch_gp.crs)
 
+
     # A better way of handling indexes would be nice but for now you must add manually.
-    # if 'id' in opCatch_gp.columns:
-    #     print("id column exists - continue")
-    # else:
-    #     print("id column does not exists - add one")
-    #     opCatch_gp['id'] = opCatch_gp.index + 1000
+    if 'id' in opCatch_gp.columns:
+        print("id column exists - continue")
+    else:
+        print("id column does not exists - add one")
+        opCatch_gp['id'] = opCatch_gp.index + 1000
 
 
     id_listA = list(opCatch_gp['id'])
@@ -52,13 +53,12 @@ def BDC_setup_main(rivers_root, dem_path, bvi_etc_root, operCatch, os_gridPath, 
         opCatSelec = opCatch_gp[opCatch_gp.id == area]
         opCatSelec.crs = ({'init': 'epsg:' + epsg_code})
         exp_path = os.path.join(outFolder,
-                                   "OC{0}_catchmentArea.shp".format(area))  # define the output shp file name
-        opCatSelec.to_file(exp_path,
-                            driver="ESRI Shapefile")
+                                   "OC{0}_catchmentArea.gpkg".format(area))  # define the output shp file name
+        opCatSelec.to_file(exp_path)
 
         coords, grid_List = get_extents(opCatSelec, os_gridPath, epsg_code)
 
-        get_rivs_arc(rivers_root, operCatch, grid_List, outFolder, area)
+        get_rivs_arc(rivers_root, opCatSelec, grid_List, outFolder, area)
         get_inWatArea(bvi_etc_root, opCatSelec, epsg_code, grid_List, outFolder, area)
         get_bvi(bvi_etc_root, epsg_code, coords, outFolder, area, grid_List, opCatSelec)
         get_dem(dem_path, epsg_code, coords, outFolder, area, grid_List, opCatSelec)
@@ -103,8 +103,9 @@ def get_rivs_arc(riv_root, oc_shp, grid_list, outfold, hyd_num):
     #     arcpy.Delete_management(tempo_gdb)
     # arcpy.CreateFileGDB_management(outfold, gdb_name)
 
-    oc_area = gpd.read_file(oc_shp)
-    oc_area = oc_area.loc[oc_area.id == hyd_num].copy()
+    # oc_area = gpd.read_file(oc_shp)
+    oc_area = oc_shp.loc[oc_shp.id == hyd_num].copy()
+    oc_area.crs = oc_shp.crs
     # oc_area = arcpy.MakeFeatureLayer_management(oc_shp, "oc_selec", "", tempo_gdb)
     # with arcpy.da.SearchCursor(oc_area, ["id"]) as cursor:
     #     for row in cursor:
@@ -183,9 +184,8 @@ def get_inWatArea(root, oc_ha, epsg, grid_list, outfold, hyd_num):
 
     inwaterB_gp = gpd.overlay(inwaterA_gp, oc_ha, how='intersection')
 
-    export_path = os.path.join(outfold, "OC{0}_OS_InWater.shp".format(hyd_num))  # define the output shp file name
-    inwaterB_gp.to_file(export_path,
-                       driver="ESRI Shapefile")
+    export_path = os.path.join(outfold, "OC{0}_OS_InWater.gpkg".format(hyd_num))  # define the output shp file name
+    inwaterB_gp.to_file(export_path)
 
 def get_bvi(root, epsg, coords, outfold, hyd_num, grid_list, work_hydAr):
     print("extracting Beaver Veg. Index within Op Catch")

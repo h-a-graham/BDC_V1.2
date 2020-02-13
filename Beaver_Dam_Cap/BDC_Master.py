@@ -1,5 +1,5 @@
 from Beaver_Dam_Cap import Dataset_Prep
-# from Beaver_Dam_Cap import SplitLinesGeoPand
+from Beaver_Dam_Cap import SplitLinesGeoPand
 # from Beaver_Dam_Cap import BDC_Terrain_Processing
 # from Beaver_Dam_Cap import BDC_tab_GEoPand
 from Beaver_Dam_Cap import Veg_FIS
@@ -23,7 +23,9 @@ def main():
     # operCatch = os.path.abspath("C:/HG_Projects/Hugh_BDC_Files/GB_Beaver_modelling/NRW_Catchments/Severn_HA.shp")
     # operCatch = os.path.abspath("C:/HG_Projects/Hugh_BDC_Files/GB_Beaver_modelling/ENGLAND_Catchm/England_Catchments.shp") # must revisit soon.
     # operCatch = os.path.abspath("C:/HG_Projects/Hugh_BDC_Files/Alan_BDC/MC3055_shape/Ma_catch_3055.shp")
-    operCatch = os.path.abspath("C:/HG_Projects/Hugh_BDC_Files/Alan_BDC/MC3060_shape/Ma_catch_3060.shp")
+    # operCatch = os.path.abspath("C:/HG_Projects/Hugh_BDC_Files/Alan_BDC/MC3060_shape/Ma_catch_3060.shp")
+    operCatch = os.path.abspath('C:/HG_Projects/Hugh_BDC_Files/new_Version_testing/in_shps/r_otter_area_0002.gpkg')
+    # operCatch = os.path.abspath('C:/HG_Projects/Hugh_BDC_Files/new_Version_testing/in_shps/CH_area_0001.gpkg')
 
     cehHydArea = os.path.abspath("C:/HG_Projects/Hugh_BDC_Files/GB_Beaver_modelling/EA_catchments/"
                                  "FME_656D6600_1568991385841_5210/temp/hyd_areas.shp")
@@ -32,11 +34,11 @@ def main():
 
     # outRoot = os.path.abspath("D:/HG_Work/GB_Beaver_Data/ENGLAND_BDC_Out") # Need to try again
     # outRoot = os.path.abspath("D:/HG_Work/GB_Beaver_Data/NRW_Severn_Out")
-    outRoot = os.path.abspath("C:/HG_Projects/Hugh_BDC_Files/new_Version_testing")
+    outRoot = os.path.abspath("C:/HG_Projects/Hugh_BDC_Files/new_Version_testing/Exp_folder")
     epsg_code = str(27700)
 
-    prep_only = True
-    skip_prep = False
+    prep_only = False
+    skip_prep = True
 
     if skip_prep is False:
         print("running data prep script to organise inputs for all target Dam Capacity Areas/ Catchments")
@@ -70,9 +72,9 @@ def main():
                     print("working reaches already exist, skip split lines")
                 else:
                     print("running line splitting tool")
-                    SplitLinesGeoPand.main(home, raw_lines)
+                    SplitLinesGeoPand.main(home, raw_lines, epsg_code)
 
-                split_lines = os.path.join(home, "BDC_reaches.shp")
+                split_lines = os.path.join(home, "BDC_reaches.gpkg")
 
                 DEM_path = os.path.join(home, "OC{0}_DTM.tif".format(ocNum))  # Below commented out for testing split lines
                 in_waterArea = os.path.join(home, "OC{0}_OS_InWater.shp".format(ocNum))
