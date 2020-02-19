@@ -1,7 +1,7 @@
 from Beaver_Dam_Cap import Dataset_Prep
 from Beaver_Dam_Cap import SplitLinesGeoPand
-# from Beaver_Dam_Cap import BDC_Terrain_Processing
-# from Beaver_Dam_Cap import BDC_tab_GEoPand
+from Beaver_Dam_Cap import BDC_Terrain_Processing
+from Beaver_Dam_Cap import BDC_tab_GEoPand
 from Beaver_Dam_Cap import Veg_FIS
 from Beaver_Dam_Cap import iHyd
 from Beaver_Dam_Cap import Comb_FIS
@@ -65,8 +65,7 @@ def main():
                 home = os.path.join(outRoot, direc)
                 raw_lines = os.path.join(home, "OC{0}_MM_rivers.gpkg".format(ocNum))
 
-
-                split_lines = os.path.join(home, "BDC_reaches.shp")
+                split_lines = os.path.join(home, "BDC_reaches.gpkg")
 
                 if os.path.isfile(split_lines):
                     print("working reaches already exist, skip split lines")
@@ -74,10 +73,9 @@ def main():
                     print("running line splitting tool")
                     SplitLinesGeoPand.main(home, raw_lines, epsg_code)
 
-                split_lines = os.path.join(home, "BDC_reaches.gpkg")
 
                 DEM_path = os.path.join(home, "OC{0}_DTM.tif".format(ocNum))  # Below commented out for testing split lines
-                in_waterArea = os.path.join(home, "OC{0}_OS_InWater.shp".format(ocNum))
+                in_waterArea = os.path.join(home, "OC{0}_OS_InWater.gpkg".format(ocNum))
                 BVI_raster = os.path.join(home, "OC{0}_BVI.tif".format(ocNum))
 
                 gdb_name = "scratch_OC{0}".format(ocNum)
@@ -91,25 +89,25 @@ def main():
                 print("runnning BDC data extraction script")
                 DEM_burn = os.path.join(home, "BDC_OC{0}strBurndDEm.tif".format(ocNum))
                 DrAreaRas = os.path.join(home, "DrainArea_sqkm.tif")
-                spltLinesP2 = os.path.join(scratch_gdb + "/seg_network_b.gpkg")
+                spltLinesP2 = os.path.join(scratch_gdb, "seg_network_b.gpkg")
 
                 paramList = [DEM_burn, DrAreaRas, spltLinesP2]
                 for p in paramList:
                     if os.path.exists(p) is False:
                         print()
-                        BDC_Terrain_Processing.main(home, scratch_gdb, split_lines, DEM_path)
+                        BDC_Terrain_Processing.main(home, scratch_gdb, split_lines, DEM_path, epsg_code)
                     else:
                         print('{0} aready exitst! woop'.format(p))
 
                 BDC_tab_GEoPand.main(home, spltLinesP2, DEM_burn, in_waterArea, BVI_raster, DrAreaRas) # current
 
-                os.path.join(home, "BDC_OC{0}".format(ocNum), "Output_BDC_OC{0}.gpkg".format(ocNum))
-                bdc_net = os.path.join(home, "BDC_OC{0}".format(ocNum), "Output_BDC_OC{0}.gpkg".format(ocNum))
+                # os.path.join(home, "BDC_OC{0}".format(ocNum), "Output_BDC_OC{0}.gpkg".format(ocNum))
+                bdc_net = os.path.join(home, "BDC_OC{0}".format(ocNum), "Output_BDC_OC{0}.shp".format(ocNum))
                 print(bdc_net)
                 print("running Vegetation Fuzzy Inference System")
                 Veg_FIS.main(bdc_net, scratch_gdb)
 
-                opCatchArea = os.path.join(home, "OC{0}_catchmentArea.shp".format(ocNum))
+                opCatchArea = os.path.join(home, "OC{0}_catchmentArea.gpkg".format(ocNum))
                 print("running Hydrological Fuzzy Inference System")
                 iHyd.main(bdc_net, scratch_gdb, cehHydArea, opCatchArea)
 

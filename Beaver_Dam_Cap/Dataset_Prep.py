@@ -133,7 +133,8 @@ def get_rivs_arc(riv_root, oc_shp, grid_list, outfold, hyd_num):
                 riv_gpd = gpd.read_file(shp_file)
                 # temp_rivs = os.path.join(tempo_gdb, 'temp_rivs{0}'.format(count)
 
-
+                if oc_area.loc[0, 'geometry'].is_valid is False: # fixes catchment if geometery is invalid
+                    oc_area.loc[0, 'geometry'] = oc_area.loc[0, 'geometry'].buffer(0)
                 rivs_clipped = ec.clip_shp(riv_gpd, oc_area)
                 # Remove empty geometries
                 rivs_clipped = rivs_clipped[~rivs_clipped.is_empty]
