@@ -2,8 +2,6 @@
 from datetime import datetime
 import os
 import sys
-import pysheds
-from pysheds.grid import Grid
 import rasterio
 import geopandas as gpd
 from rasterio import features
@@ -32,7 +30,7 @@ def main(path, scratch_gdb, seg_network_a, DEM_orig, epsg):
 
     print("Run Flow Accumulation / Drainage area raster Process")
     flowacc, strord_lines = run_grass(scratch_gdb, stream_burn_dem)
-    # DrAreaPath, FlowDir = calc_drain_area(stream_burn_dem, scratch_gdb, DEM_orig, ras_meta)
+
     acc_to_contarea(DEM_orig, flowacc)
 
 
@@ -44,7 +42,6 @@ def main(path, scratch_gdb, seg_network_a, DEM_orig, epsg):
         print("stream ordering alredy done...")
 
     else:
-        # seg_net_gdf = get_stream_order(scratch_gdb, riv_gdf, DEM_orig, FlowDir, net_raster)
         seg_net_gdf =join_str_order(riv_gdf, strord_lines)
         seg_net_gdf.crs = ({'init': 'epsg:' + epsg})
         seg_net_gdf.to_file(reaches_out)
@@ -70,10 +67,8 @@ def streamBurning(DEM_orig, scratch_gdb, seg_network_a, home, home_name):
         meta.update(compress='lzw')
         dem_arr = dem.read(1)
 
-    # rivers_ras = os.path.join(scratch_gdb, 'river_ras.tif')
     riv_ras = os.path.join(scratch_gdb, "{0}Riv_Ras.tif".format(home_name))
-    # meta_bin = meta.copy()
-    # meta_bin.update(dtype=np.byte)
+
     with rasterio.open(riv_ras, 'w+', **meta) as out:
         out_arr = out.read(1)
 
@@ -152,16 +147,6 @@ def join_str_order(streams_gdf, str_ord_lines):
     riv_centroids['join_key'] = riv_centroids.index
     riv_centroids['geometry'] = riv_centroids['geometry'].centroid
     riv_centroids['geometry'] = riv_centroids['geometry'].buffer(15)
-    # so_gdf['geometry'] = so_gdf['geometry'].buffer(10)
-    # so_gdf = so_gdf[['strahler', 'geometry']].copy
-    # so_centroids['geometry'] = so_centroids['geometry'].centroid
-    # min_dist = []
-    # for idx, point in pd.itterows(so_centroids):
-    #     for i in
-    #     min_dist[i] = np.min([point.distance(line) for line in lines])
-    # df_points['min_dist_to_lines'] = min_dist
-    # df_points.head(3)
-
 
     streams_so_join = gpd.sjoin(riv_centroids, so_gdf, how='left', op='intersects', lsuffix='left',
                              rsuffix='right')
@@ -177,78 +162,6 @@ def join_str_order(streams_gdf, str_ord_lines):
     streams_so_join["Str_order"] = streams_so_join["Str_order"].fillna(value=1)
 
     return streams_so_join
-
-
-
-############################################################################################
-###################### Drainage area calcs ##################################################
-############################################################################################
-
-# def calc_drain_area(stream_burn_dem, scratch_gdb, DEM_orig, meta):
-#
-#
-#     grid = Grid.from_raster(stream_burn_dem, data_name='dem')
-#
-#     grid.fill_depressions(data='dem', out_name='flooded_dem')
-#
-#     grid.resolve_flats(data='flooded_dem', out_name='inflated_dem')
-#
-#     dirmap = (64, 128, 1, 2, 4, 8, 16, 32)
-#
-#     grid.flowdir(data='inflated_dem', out_name='dir', dirmap=dirmap)
-#     flow_d_arr = np.array(grid.view('dir'), dtype='int32')
-#     # grid.to_raster('dir', flow_direction, dtype='uint32')
-#     flow_direction = os.path.join(scratch_gdb, "flow_dir.tif")
-#
-#     int_meta = meta.copy()
-#     int_meta.update({'dtype': 'int32'})
-#
-#     with rasterio.open(flow_direction, 'w+', **int_meta) as out:
-#         out.write_band(1, flow_d_arr)
-#
-#
-#     grid.accumulation(data='dir', out_name='acc', dirmap=dirmap)
-#
-#     flowacc = np.array(grid.view('acc'))
-#     res = abs(meta.get('transform')[0])
-#     drain_area = (flowacc * (res*res) / 1000000).astype(dtype='float32')
-#
-#     DEM_dirname = os.path.dirname(DEM_orig)
-#     DrArea_path = os.path.join(DEM_dirname, "DrainArea_sqkm.tif")
-#
-#     with rasterio.open(DrArea_path, 'w+', **meta) as out:
-#         out.write_band(1, drain_area)
-#
-#     print("drainage area Raster completed")
-#
-#     return DrArea_path, flow_direction
-#
-
-###############################################################################
-################# STREAM ORDERING ############################################
-###############################################################################
-# def get_stream_order(scratch_gdb, streams_gdf, DEM_orig, FlowDir, net_raster):
-#     out_poly = scratch_gdb + "/st_ord_poly.shp"
-#
-#     command = os.path.abspath("C:/Program Files/ArcGIS/Pro/bin/Python/envs/arcgispro-py3/python.exe")
-#     scriptHome = os.path.dirname(__file__)
-#     # print(scriptHome)
-#     myscript_loc = os.path.join(scriptHome, "Stream_Order_Sub.py")
-#
-#     args = [scratch_gdb, FlowDir, net_raster, out_poly]
-#     # print(args)
-#     cmd = [command, myscript_loc] + args
-#
-#     str_ord_poly_path = subprocess.check_output(cmd, universal_newlines=True)
-#
-#     str_ord_poly_gdf = gpd.read_file(os.path.abspath(str_ord_poly_path)[:-1])
-#
-#     streams_join = gpd.sjoin(streams_gdf, str_ord_poly_gdf, how='inner', op='intersects', lsuffix='left', rsuffix='right')
-#
-#     streams_join = gpd.GeoDataFrame(streams_join[['reach_leng', 'gridcode', 'geometry']], geometry='geometry')
-#     streams_join = streams_join.rename(columns={"gridcode": "Str_order"})
-#
-#     return streams_join
 
 
 if __name__ == '__main__':

@@ -27,7 +27,7 @@ def BDC_setup_main(rivers_root, dem_path, bvi_etc_root, operCatch, os_gridPath, 
         print("create export folder")
         os.makedirs(outRoot)
 
-    opCatch_gp = gpd.read_file(operCatch, driver="ESRI Shapefile")
+    opCatch_gp = gpd.read_file(operCatch)
     opCatch_gp.to_crs = ({'init': 'epsg:' + epsg_code})
     print(opCatch_gp.crs)
 

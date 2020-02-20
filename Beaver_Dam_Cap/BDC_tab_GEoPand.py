@@ -188,7 +188,7 @@ def MainProcessing(iw_area_merge, DEM_orig, DrArea, coded_vega, proj_crs, full_n
     clipgeoms = CreateOverlayGeoms(strNet_gdf=seg_network, inWatArea_gdf=iw_area_merge,
                                    crs=proj_crs, process_name=proc_name)
 
-    # clipgeoms['geometry'] = gpd.GeoSeries([MultiPolygon([x]) for x in clipgeoms['geometry']])
+
     print("clipping the reach areas")
     # TestTime = datetime.now()
     reach_areas = ClipAreasbyWater(mainShape=pre_area_buff, ClipShape=clipgeoms, crs=proj_crs, process_name=proc_name)
@@ -213,7 +213,6 @@ def MainProcessing(iw_area_merge, DEM_orig, DrArea, coded_vega, proj_crs, full_n
     buf_40m['geometry'] = reach_areas.buffer(distance=40)
     buf_40m['reach_no'] = reach_areas['reach_no']
     buf_40m.crs = proj_crs
-    # buf_40m = geomparalellProcess(net_gdf=buf_40m, func=EraseAreasbyWater, iwa_gdf=clipgeoms, crs=proj_crs)
     buf_40m = EraseAreasbyWater(mainShape=buf_40m, ClipShape=clipgeoms, crs=proj_crs, process_name=proc_name)
 
     print("getting start elevation values")
@@ -327,20 +326,12 @@ def CreateOverlayGeoms(strNet_gdf, inWatArea_gdf, crs, process_name):
         # out_gdf['reach_no'] = shp['reach_no']
         gdfList.append(out_gdf)
 
-        # print_progress(counter + 1, shpLen, prefix='Overlay Geoms - {0}:'.format(process_name), suffix='Complete')
-
     clipping_gdf = gpd.GeoDataFrame(pd.concat(gdfList, ignore_index=True))
     clipping_gdf.crs = crs
     clipping_gdf['merge'] = 'merge'
     m_poly = clipping_gdf.dissolve(by='merge')
     m_poly = m_poly.reset_index()
     m_poly = m_poly.drop(columns='merge')
-
-    # m_poly.plot()
-    # plt.show()
-    #
-    # print(m_poly.head())
-
 
     print('Overlay Geoms - {0}: Completed'.format(process_name))
     return m_poly
@@ -454,18 +445,8 @@ def GetTopHalfMean(stat_df, process_name):
 
 def ClipAreasbyWater(mainShape, ClipShape, crs, process_name):
 
-    # shpLen = len(mainShape)
-    # mainShape.geometry = gpd.GeoSeries([MultiPolygon([x]) for x in mainShape['geometry']])
-
-    # mainShape.reset_index()
-    # ClipShape.reset_index()
     count = 0
-
-    # p = wkt.loads(u'POLYGON((0 0,0 1,1 1,0 0))')
-    # m = MultiPolygon([p])
-    # print(m.wkt)
-
-    geom_list= []
+    geom_list = []
     rn_list = []
 
     for i, row in mainShape.iterrows():
@@ -481,8 +462,6 @@ def ClipAreasbyWater(mainShape, ClipShape, crs, process_name):
             print(e)
             main_so = MultiPolygon([main_so])
 
-        # workArea = ClipShape.loc[ClipShape['reach_no'] == reachNum]
-
         try:
             newgeom = main_so.intersection(ClipShape['geometry'].values[0])
 
@@ -496,17 +475,13 @@ def ClipAreasbyWater(mainShape, ClipShape, crs, process_name):
             print(e)
             print('clip failed - returning non altered buffer for {0}'.format(reachNum))
             newgeom = main_so
-            # if newgeom.geom_type != 'MultiPolygon':
-            #     newgeom = MultiPolygon([newgeom])
 
         try:
-            # mainShape.loc[[i], 'geometry'] = gpd.GeoSeries(newgeom).values
             geom_list.append(newgeom)
             rn_list.append(reachNum)
         except Exception as e:
             print(e)
             print("BREAK_{}!".format(count))
-        # print_progress(count, shpLen, prefix='Clip Water Areas - {0}:'.format(process_name), suffix='Complete')
 
     print('Clip Water Areas - {0}: Completed'.format(process_name))
     out_shape = gpd.GeoDataFrame(geometry=gpd.GeoSeries(geom_list))
@@ -517,8 +492,6 @@ def ClipAreasbyWater(mainShape, ClipShape, crs, process_name):
 
 
 def EraseAreasbyWater(mainShape, ClipShape, crs, process_name):
-    # mainShape['geometry'] = gpd.GeoSeries([MultiPolygon([x]) for x in mainShape['geometry']])
-    # shpLen = len(mainShape)
     geom_list = []
     rn_list=[]
     count = 0
@@ -534,9 +507,6 @@ def EraseAreasbyWater(mainShape, ClipShape, crs, process_name):
         try:
             newgeom = main_so.difference(ClipShape['geometry'].values[0])
 
-            # if newgeom.geom_type != 'MultiPolygon':
-            #     newgeom = MultiPolygon([newgeom])
-
             if newgeom.is_empty:
                 print("EMPTY_ERASE_GEOM")
                 newgeom = main_so
@@ -544,11 +514,8 @@ def EraseAreasbyWater(mainShape, ClipShape, crs, process_name):
             print(e)
             print('erase failed - returning non altered buffer for {0}'.format(reachNum))
             newgeom = main_so
-            # if newgeom.geom_type != 'MultiPolygon':
-            #     newgeom = MultiPolygon([newgeom])
 
         try:
-            # mainShape.loc[[i], 'geometry'] = gpd.GeoSeries(newgeom).values
             geom_list.append(newgeom)
             rn_list.append(reachNum)
         except Exception as e:
@@ -592,11 +559,3 @@ def paralellProcess(net_gdf, iw_area_shp, sb_DEM, DrAreaPathIn, coded_vegIn, pro
     return gdf
 
 
-# if __name__ == '__main__':
-#     main(
-#         sys.argv[1],
-#         sys.argv[2],
-#         sys.argv[3],
-#         sys.argv[4],
-#         sys.argv[5],
-#         sys.argv[6])

@@ -7,17 +7,9 @@ import sys
 def main(home, rivers, epsg):
     rivers_gpd = gpd.read_file(rivers)
 
-    # print(rivers_gpd.geometry.length.sum())
-    # print(len(rivers_gpd.index))
-    # print(rivers_gpd.geometry.length.max())
-
     split_gdf = split_recurs(rivers_gpd)
 
     split_gdf.crs = ({'init': 'epsg:' + epsg})
-
-    # print(split_gdf.geometry.length.sum())
-    # print(len(split_gdf.index))
-    # print(split_gdf.geometry.length.max())
 
     split_gdf.to_file(os.path.join(home, "BDC_reaches.gpkg"))
 

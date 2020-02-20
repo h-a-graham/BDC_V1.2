@@ -7,6 +7,7 @@ import json
 # import arcpy
 import matplotlib.pyplot as plt
 import sys
+import rtree
 
 ### ISSUES: crs for output is not in OSGB and I'm struggling to set up geopandas to allow it to change -  I have use arcpy?
 def main():
@@ -42,7 +43,7 @@ def main():
     # gjf = os.path.abspath("C:/Users/hughg/Desktop/GB_Beaver_modelling/EA_catchments")
     gjf = os.path.abspath("C:/HG_Projects/Hugh_BDC_Files/Alan_BDC")
     epsg_code = 27700
-    outfold = os.path.join(gjf, "Alan_Batch_shape")
+    outfold = os.path.join(gjf, "Alan_Batch_gpkg")
 
     if os.path.isdir(outfold):
         print("output folder already exists")
@@ -67,7 +68,7 @@ def main():
 
             # print(data)
 
-            out_file = os.path.join(outfold, "{0}_catch_{1}.shp".format(ab, catch))
+            out_file = os.path.join(outfold, "{0}_catch_{1}.gpkg".format(ab, catch))
             gp_df = gpd.read_file(str(data), driver="GeoJSON")
             gp_df['id'] = catch
             gp_df['opc_NAME'] = oc
@@ -77,10 +78,12 @@ def main():
             # gp_df.to_crs({'init': 'epsg:' + epsg_code})
             # print(gp_df.crs)
             gpd_lis.append(gp_df)
+            gp_df.crs = {'init': 'epsg:4326'}
 
-            gp_df.to_file(out_file, driver="ESRI Shapefile")
+            gp_df = gp_df.to_crs({'init': 'epsg:{}'.format(epsg_code)})
+            gp_df.to_file(out_file, driver="GPKG")
 
-    out_f = os.path.join(outfold, "{0}_catchments_All.shp".format(ab))
+    out_f = os.path.join(outfold, "{0}_catchments_All.gpkg".format(ab))
     print("merging all catchments")
     rdf = gpd.GeoDataFrame(pd.concat(gpd_lis, ignore_index=True),
                            crs=gpd_lis[0].crs)
@@ -96,11 +99,12 @@ def main():
 
     rdf = rdf.to_crs({'init': 'epsg:{}'.format(epsg_code)})
 
-    rdf.to_file(out_f, driver="ESRI Shapefile")
+    rdf.to_file(out_f, driver="GPKG")
 
-    check_gdf = gpd.read_file(out_f, driver="ESRI Shapefile")
+    check_gdf = gpd.read_file(out_f, driver="GPKG")
     check_gdf.plot(column='opc_NAME')
     plt.show()
+    print(check_gdf.crs)
 
 if __name__ == '__main__':
     main()

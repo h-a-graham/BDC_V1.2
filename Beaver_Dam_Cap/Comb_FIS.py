@@ -2,12 +2,11 @@
 # Name:        Comb_FIS
 # Purpose:     Runs the combined FIS for the BRAT input table
 #
-# Author:      Jordan Gilbert + Hugh Graham
+# Author:
 #
-# Created:     10/2018
+# Created:
 #-------------------------------------------------------------------------------
 
-# import arcpy
 import skfuzzy as fuzz
 from skfuzzy import control as ctrl
 import numpy as np
@@ -30,47 +29,10 @@ def main(in_network, scratch):
     net_gpd.loc[net_gpd['iHyd_SPLow'] < 0, 'iHyd_SPLow'] = 0.001
     net_gpd.loc[net_gpd['iHyd_SPLow'] > 10000, 'iHyd_SPLow'] = 10000
 
-    # arcpy.env.overwriteOutput = True
-    #
-    # # check that inputs are within range of fis (slope already taken care of)
-    # with arcpy.da.UpdateCursor(in_network, ["oVC_EX", "iHyd_SP2", "iHyd_SPLow"]) as cursor:
-    #     for row in cursor:
-    #         if row[0] < 0:
-    #             row[0] = 0
-    #         elif row[0] > 45:
-    #             row[0] = 44
-    #         elif row[1] < 0:
-    #             row[1] = 0.001
-    #         elif row[1] > 10000:
-    #             row[1] = 10000
-    #         elif row[2] < 0:
-    #             row[2] = 0.001
-    #         elif row[2] > 10000:
-    #             row[2] = 10000
-    #         else:
-    #             pass
-    #         cursor.updateRow(row)
-    # del row
-    # del cursor
-
-    # get arrays for fields of interest
-    # ovcex_a = arcpy.da.FeatureClassToNumPyArray(in_network, "oVC_EX")
-    # ihydsp2_a = arcpy.da.FeatureClassToNumPyArray(in_network, "iHyd_SP2")
-    # ihydsplow_a = arcpy.da.FeatureClassToNumPyArray(in_network, "iHyd_SPLow")
-    # igeoslope_a = arcpy.da.FeatureClassToNumPyArray(in_network, "iGeo_Slope")
-
     ovcex_array = net_gpd['oVC_EX'].values
     ihydsp2_array = net_gpd['iHyd_SP2'].values
     ihydsplow_array = net_gpd['iHyd_SPLow'].values
     igeoslope_array = net_gpd['iGeo_Slope'].values
-
-
-    # ovcex_array = np.asarray(ovcex_a, np.float64)
-    # ihydsp2_array = np.asarray(ihydsp2_a, np.float64)
-    # ihydsplow_array = np.asarray(ihydsplow_a, np.float64)
-    # igeoslope_array = np.asarray(igeoslope_a, np.float64)
-
-    # del ovcex_a, ihydsp2_a, ihydsplow_a, igeoslope_a
 
     ovc = ctrl.Antecedent(np.arange(0, 45, 0.225), 'input1')
     sp2 = ctrl.Antecedent(np.arange(0, 10000, 1), 'input2')
@@ -192,8 +154,6 @@ def main(in_network, scratch):
         out[i] = comb_fis.output['result']
 
     net_gpd['BDC'] = out
-
-    # net_gpd['iGeo_Width'] = net_gpd['iGeo_Width'].fillna(value=50)
 
     net_gpd.loc[net_gpd['oVC_EX'] <= 0, 'BDC'] = 0
     net_gpd.loc[net_gpd['iHyd_SPLow'] > 190, 'BDC'] = 0
