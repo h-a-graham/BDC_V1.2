@@ -26,8 +26,9 @@ def main():
     # operCatch = os.path.abspath("C:/HG_Projects/Hugh_BDC_Files/Alan_BDC/MC3060_shape/Ma_catch_3060.shp")
     # operCatch = os.path.abspath('C:/HG_Projects/Hugh_BDC_Files/new_Version_testing/in_shps/r_otter_area_0002.gpkg')
     # operCatch = os.path.abspath('C:/HG_Projects/Hugh_BDC_Files/new_Version_testing/in_shps/CH_area_0001.gpkg')
-    operCatch = os.path.abspath('C:/HG_Projects/Hugh_BDC_Files/Alan_BDC/Alan_Batch_gpkg/Ma_catch_3089.gpkg')
+    # operCatch = os.path.abspath('C:/HG_Projects/Hugh_BDC_Files/Alan_BDC/Alan_Batch_gpkg/Ma_catch_3089.gpkg')
 
+    operCatch = os.path.abspath('C:/HG_Projects/Hugh_BDC_Files/Alan_BDC/Alan_Batch_gpkg/Ma_catchments_All.gpkg')
 
     cehHydArea = os.path.abspath("C:/HG_Projects/Hugh_BDC_Files/GB_Beaver_modelling/EA_catchments/"
                                  "FME_656D6600_1568991385841_5210/temp/hyd_areas.shp")
@@ -36,8 +37,10 @@ def main():
 
     # outRoot = os.path.abspath("D:/HG_Work/GB_Beaver_Data/ENGLAND_BDC_Out") # Need to try again
     # outRoot = os.path.abspath("D:/HG_Work/GB_Beaver_Data/NRW_Severn_Out")
-    outRoot = os.path.abspath("C:/HG_Projects/Hugh_BDC_Files/new_Version_testing/Tamar_Test")
+    # outRoot = os.path.abspath("C:/HG_Projects/Hugh_BDC_Files/new_Version_testing/Tamar_Test")
     # outRoot = os.path.abspath("C:/HG_Projects/Hugh_BDC_Files/new_Version_testing/Exp_folder")
+    outRoot = os.path.abspath('C:/HG_Projects/Hugh_BDC_Files/Alan_BDC/Batch_Job0220')
+
     epsg_code = str(27700)
 
     prep_only = False
