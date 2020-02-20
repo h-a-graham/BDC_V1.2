@@ -2,12 +2,11 @@
 # Name:        Comb_FIS
 # Purpose:     Runs the combined FIS for the BRAT input table
 #
-# Author:      Jordan Gilbert + Hugh Graham
+# Author:
 #
-# Created:     10/2018
+# Created:
 #-------------------------------------------------------------------------------
 
-# import arcpy
 import skfuzzy as fuzz
 from skfuzzy import control as ctrl
 import numpy as np
@@ -17,7 +16,7 @@ import geopandas as gpd
 
 
 def main(in_network, scratch):
-    max_DA_thresh = 250
+    max_DA_thresh = 100
     max_Width_thresh = 25
 
 
@@ -30,47 +29,10 @@ def main(in_network, scratch):
     net_gpd.loc[net_gpd['iHyd_SPLow'] < 0, 'iHyd_SPLow'] = 0.001
     net_gpd.loc[net_gpd['iHyd_SPLow'] > 10000, 'iHyd_SPLow'] = 10000
 
-    # arcpy.env.overwriteOutput = True
-    #
-    # # check that inputs are within range of fis (slope already taken care of)
-    # with arcpy.da.UpdateCursor(in_network, ["oVC_EX", "iHyd_SP2", "iHyd_SPLow"]) as cursor:
-    #     for row in cursor:
-    #         if row[0] < 0:
-    #             row[0] = 0
-    #         elif row[0] > 45:
-    #             row[0] = 44
-    #         elif row[1] < 0:
-    #             row[1] = 0.001
-    #         elif row[1] > 10000:
-    #             row[1] = 10000
-    #         elif row[2] < 0:
-    #             row[2] = 0.001
-    #         elif row[2] > 10000:
-    #             row[2] = 10000
-    #         else:
-    #             pass
-    #         cursor.updateRow(row)
-    # del row
-    # del cursor
-
-    # get arrays for fields of interest
-    # ovcex_a = arcpy.da.FeatureClassToNumPyArray(in_network, "oVC_EX")
-    # ihydsp2_a = arcpy.da.FeatureClassToNumPyArray(in_network, "iHyd_SP2")
-    # ihydsplow_a = arcpy.da.FeatureClassToNumPyArray(in_network, "iHyd_SPLow")
-    # igeoslope_a = arcpy.da.FeatureClassToNumPyArray(in_network, "iGeo_Slope")
-
     ovcex_array = net_gpd['oVC_EX'].values
     ihydsp2_array = net_gpd['iHyd_SP2'].values
     ihydsplow_array = net_gpd['iHyd_SPLow'].values
     igeoslope_array = net_gpd['iGeo_Slope'].values
-
-
-    # ovcex_array = np.asarray(ovcex_a, np.float64)
-    # ihydsp2_array = np.asarray(ihydsp2_a, np.float64)
-    # ihydsplow_array = np.asarray(ihydsplow_a, np.float64)
-    # igeoslope_array = np.asarray(igeoslope_a, np.float64)
-
-    # del ovcex_a, ihydsp2_a, ihydsplow_a, igeoslope_a
 
     ovc = ctrl.Antecedent(np.arange(0, 45, 0.225), 'input1')
     sp2 = ctrl.Antecedent(np.arange(0, 10000, 1), 'input2')
@@ -197,76 +159,25 @@ def main(in_network, scratch):
     net_gpd.loc[net_gpd['iHyd_SPLow'] > 190, 'BDC'] = 0
     net_gpd.loc[net_gpd['iGeo_Slope'] >= 0.23, 'BDC'] = 0
     net_gpd.loc[net_gpd['iGeo_Width'] >= float(max_Width_thresh), 'BDC'] = 0
+
     net_gpd.loc[net_gpd['iGeo_DA'] >= float(max_DA_thresh), 'BDC'] = 0
     net_gpd.loc[(net_gpd['Str_order'] == 5) & (net_gpd['BDC'] >= 1), 'BDC'] = 0.9
     net_gpd.loc[net_gpd['Str_order'] >= 6, 'BDC'] = 0
     net_gpd.loc[net_gpd['BDC'] > net_gpd['oVC_EX'], 'BDC'] = net_gpd['oVC_EX']
 
-    net_gpd.to_file(in_network, driver="ESRI Shapefile")
+    net_gpd.to_file(in_network)
 
-    # # save the output text file
-    # reach_no = np.arange(1, len(out) + 1, 1)
-    # # np.arange()
-    # columns = np.column_stack((reach_no, out))
-    # out_table = os.path.dirname(in_network) + '/BDC_Table.txt'
-    # np.savetxt(out_table, columns, delimiter=',', header='reach_no, BDC', comments='')
-    #
-    # bdc_fields = [f.name for f in arcpy.ListFields(in_network)]
-    # # if "oCC_EX" in bdc_fields:
-    # #     print("field oCC_EX already exists - deleting")
-    # #     arcpy.DeleteField_management(in_network, 'oCC_EX')
-    # if "BDC" in bdc_fields:
-    #     print("field BDC already exists - deleting")
-    #     arcpy.DeleteField_management(in_network, 'BDC')
-    #
-    # occ_table = scratch + '/bdc_table'
-    # arcpy.CopyRows_management(out_table, occ_table)
-    # arcpy.JoinField_management(in_network, 'reach_no', occ_table, 'reach_no', 'BDC')
-    # # arcpy.Delete_management(out_table)
-    #
-    # del out, reach_no, columns
-    # if arcpy.Exists(out_table):
-    #     arcpy.Delete_management(out_table)
-    # if arcpy.Exists(occ_table):
-    #     arcpy.Delete_management(occ_table)
+    import pandas as pd
+    pd.set_option('display.max_rows', 500)
+    pd.set_option('display.max_columns', 500)
+    pd.set_option('display.width', 1000)
 
+    print(net_gpd.tail())
+    print('top')
 
-    # with arcpy.da.UpdateCursor(in_network, ["oVC_EX", "iHyd_SPLow", "iGeo_Slope", "iGeo_DA", "BDC", "iGeo_Width",
-    #                                             "Str_order"]) as cursor:
-    #     for row in cursor:
-    #         if row[0] == 0:
-    #             row[4] = 0
-    #         elif row[1] > 190:
-    #             row[4] = 0
-    #
-    #         elif row[2] >= 0.23:
-    #             row[4] = 0
-    #
-    #         elif row[5] >= float(max_Width_thresh):
-    #             row[4] = 0
-    #
-    #         elif row[3] >= float(max_DA_thresh):
-    #             row[4] = 0
-    #
-    #         elif row[6] >= 5:  # New addition - now using stream order (created in parallel BRAT table) to set thresholds
-    #             if row[6] == 5 and row[4] > 1:
-    #                 row[4] = 0.9
-    #             elif row[6] >= 6:
-    #                 row[4] = 0
-    #             else:
-    #                 pass
-    #
-    #         elif row[4] > row[0]:
-    #             row[4] = row[0]
-    #
-    #         else:
-    #             pass
-    #         cursor.updateRow(row)
-        # del row
-        # del cursor
-
-
-    # arcpy.CopyFeatures_management(in_network, out_network)
+    from matplotlib import pyplot as plt
+    net_gpd.plot(column='BDC')
+    plt.show()
 
 
 if __name__ == '__main__':

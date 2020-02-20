@@ -32,8 +32,9 @@ import shutil
 # import math
 from shapely.geometry import Point, Polygon, MultiPolygon, LinearRing
 from shapely.ops import cascaded_union
-import arcpy
-
+from shapely.geometry.multipolygon import MultiPolygon
+from shapely import wkt
+from matplotlib import pyplot as plt
 
 ############# START TIME ##############
 startTime = datetime.now()
@@ -81,19 +82,19 @@ def PrepStrNet(seg_net_pathA, home, h_name):
         shutil.rmtree(scratch)
     os.mkdir(scratch)
 
-    print('making copy of input network')
-    seg_net_path = os.path.join(scratch, "workingNet.shp")
-    arcpy.CopyFeatures_management(seg_net_pathA, seg_net_path)
-    print('Deleting Features with identical geometries')
-    arcpy.DeleteIdentical_management(seg_net_path, ['Shape'])
-    ##################################################
+    # print('making copy of input network')
+    # seg_net_path = os.path.join(scratch, "workingNet.shp")
+    # arcpy.CopyFeatures_management(seg_net_pathA, seg_net_path)
+    # print('Deleting Features with identical geometries')
+    # arcpy.DeleteIdentical_management(seg_net_path, ['Shape'])
+    # ##################################################
     print("set up out network path")
 
     out_networkp = os.path.join(home, "Output_{0}.shp".format(h_name))
 
     print("let's get started")
 
-    seg_network = gpd.read_file(seg_net_path, driver="ESRI Shapefile")
+    seg_network = gpd.read_file(seg_net_pathA)
     project_crs = seg_network.crs
 
     # create sequential numbers for reaches
@@ -124,7 +125,7 @@ def CreatInWatArea(seg_network, in_water_vec_a, proj_crs):
     return iw_area_merge
 
 
-def MainProcessing(iw_area_merge, DEM_orig, DrArea, coded_vega, proj_crs, seg_network):
+def MainProcessing(iw_area_merge, DEM_orig, DrArea, coded_vega, proj_crs, full_net, seg_network):
     # set buffers for analyses
     proc_name = multiprocessing.current_process().name
 
@@ -187,6 +188,7 @@ def MainProcessing(iw_area_merge, DEM_orig, DrArea, coded_vega, proj_crs, seg_ne
     clipgeoms = CreateOverlayGeoms(strNet_gdf=seg_network, inWatArea_gdf=iw_area_merge,
                                    crs=proj_crs, process_name=proc_name)
 
+
     print("clipping the reach areas")
     # TestTime = datetime.now()
     reach_areas = ClipAreasbyWater(mainShape=pre_area_buff, ClipShape=clipgeoms, crs=proj_crs, process_name=proc_name)
@@ -203,7 +205,7 @@ def MainProcessing(iw_area_merge, DEM_orig, DrArea, coded_vega, proj_crs, seg_ne
     buf_10m['geometry'] = reach_areasb.buffer(distance=10)
     buf_10m['reach_no'] = reach_areasb['reach_no']
     buf_10m.crs = proj_crs
-
+    print("DEBUG POINT1")
     buf_10m = EraseAreasbyWater(mainShape=buf_10m, ClipShape=clipgeoms, crs=proj_crs, process_name=proc_name)
 
     print ("create foraging buffer")
@@ -211,7 +213,6 @@ def MainProcessing(iw_area_merge, DEM_orig, DrArea, coded_vega, proj_crs, seg_ne
     buf_40m['geometry'] = reach_areas.buffer(distance=40)
     buf_40m['reach_no'] = reach_areas['reach_no']
     buf_40m.crs = proj_crs
-    # buf_40m = geomparalellProcess(net_gdf=buf_40m, func=EraseAreasbyWater, iwa_gdf=clipgeoms, crs=proj_crs)
     buf_40m = EraseAreasbyWater(mainShape=buf_40m, ClipShape=clipgeoms, crs=proj_crs, process_name=proc_name)
 
     print("getting start elevation values")
@@ -237,7 +238,7 @@ def MainProcessing(iw_area_merge, DEM_orig, DrArea, coded_vega, proj_crs, seg_ne
     # add slope
     print("calculating slope")
 
-    seg_network["iGeo_Len"] = seg_network['geometry'].length
+    seg_network["iGeo_Len"] = seg_network['geometry'].length.values
 
     seg_network["iGeo_Slope"] = (seg_network["iGeo_ElMax"] - seg_network["iGeo_ElMin"])/seg_network["iGeo_Len"]
 
@@ -248,7 +249,7 @@ def MainProcessing(iw_area_merge, DEM_orig, DrArea, coded_vega, proj_crs, seg_ne
     print("calculating reach widths")
 
     # gpd_reachAreas = gpd.read_file(reach_areasc, driver="ESRI Shapefile")
-    seg_network["iGeo_Area"] = reach_areasc['geometry'].area
+    seg_network["iGeo_Area"] = reach_areasc['geometry'].area.values
     seg_network["iGeo_Width"] = seg_network["iGeo_Area"]/(seg_network["iGeo_Len"] + 40)
 
     print("zonal statistics for drainage area")
@@ -299,6 +300,7 @@ def MainProcessing(iw_area_merge, DEM_orig, DrArea, coded_vega, proj_crs, seg_ne
     print(list(seg_network))
 
     print(proc_name + " done")
+    # print(seg_network.head())
 
     return seg_network
 
@@ -321,16 +323,18 @@ def CreateOverlayGeoms(strNet_gdf, inWatArea_gdf, crs, process_name):
         matches = inWatArea_gdf.loc[bound_matches_index]
         out_gdf = gpd.GeoDataFrame()
         out_gdf['geometry'] = gpd.GeoSeries(cascaded_union(matches['geometry']))
-        out_gdf['reach_no'] = shp['reach_no']
+        # out_gdf['reach_no'] = shp['reach_no']
         gdfList.append(out_gdf)
-
-        # print_progress(counter + 1, shpLen, prefix='Overlay Geoms - {0}:'.format(process_name), suffix='Complete')
 
     clipping_gdf = gpd.GeoDataFrame(pd.concat(gdfList, ignore_index=True))
     clipping_gdf.crs = crs
+    clipping_gdf['merge'] = 'merge'
+    m_poly = clipping_gdf.dissolve(by='merge')
+    m_poly = m_poly.reset_index()
+    m_poly = m_poly.drop(columns='merge')
 
     print('Overlay Geoms - {0}: Completed'.format(process_name))
-    return clipping_gdf
+    return m_poly
 
 def PointsAlongLine(gdf_line, p_dist, process_name):
     if p_dist == 0:
@@ -393,7 +397,7 @@ def LoopRasStats(shape, Raster, stat, cat, process_name):
     dframe = pd.concat(dfList, sort=False)
     # dframe = dframe.reset_index(drop=True)
     dframe = dframe.set_index('reach_no', drop=False)
-    del dframe.index.name
+    dframe.index.name = None
 
     # dframe = dframe.sort_index(inplace=True)
     print('RasStats - {0}: Completed'.format(process_name))
@@ -433,92 +437,102 @@ def GetTopHalfMean(stat_df, process_name):
     dframe = pd.concat(stat_list, sort=False)
     # dframe = dframe.reset_index(drop=True)
     dframe = dframe.set_index('reach_no', drop=False)
-    del dframe.index.name
+    dframe.index.name = None
     # print(dframe)
     print('TopHalfMean -{0}: Completed'.format(process_name))
     return dframe
 
 
 def ClipAreasbyWater(mainShape, ClipShape, crs, process_name):
-    shpLen = len(mainShape)
 
     count = 0
+    geom_list = []
+    rn_list = []
+
     for i, row in mainShape.iterrows():
         count += 1
-        reachNum = (row['reach_no'])
-        main_so = (row['geometry'])
-
-        workArea = ClipShape.loc[ClipShape['reach_no'] == reachNum]
+        print(count)
+        reachNum = row.loc['reach_no']
+        main_so = row.loc['geometry']
 
         try:
-            newgeom = main_so.intersection(workArea['geometry'].values[0])
+            if main_so.geom_type != 'MultiPolygon':
+                main_so = MultiPolygon([main_so])
+        except AttributeError as e:
+            print(e)
+            main_so = MultiPolygon([main_so])
+
+        try:
+            newgeom = main_so.intersection(ClipShape['geometry'].values[0])
+
+            # if newgeom.geom_type != 'MultiPolygon':
+            #     newgeom = MultiPolygon([newgeom])
+
+            if newgeom.is_empty:
+                print("EMPTY GEOM!!!")
+                newgeom = main_so
         except Exception as e:
             print(e)
             print('clip failed - returning non altered buffer for {0}'.format(reachNum))
             newgeom = main_so
 
-        mainShape.at[i, 'geometry'] = newgeom
-
-        # print_progress(count, shpLen, prefix='Clip Water Areas - {0}:'.format(process_name), suffix='Complete')
+        try:
+            geom_list.append(newgeom)
+            rn_list.append(reachNum)
+        except Exception as e:
+            print(e)
+            print("BREAK_{}!".format(count))
 
     print('Clip Water Areas - {0}: Completed'.format(process_name))
-
-    mainShape.crs = crs
-    return mainShape
+    out_shape = gpd.GeoDataFrame(geometry=gpd.GeoSeries(geom_list))
+    out_shape['reach_no'] = rn_list
+    out_shape.crs = crs
+    print(out_shape)
+    return out_shape
 
 
 def EraseAreasbyWater(mainShape, ClipShape, crs, process_name):
-    shpLen = len(mainShape)
-
+    geom_list = []
+    rn_list=[]
     count = 0
     for i, row in mainShape.iterrows():
         count += 1
         reachNum = (row['reach_no'])
         main_so = (row['geometry'])
-
-        workArea = ClipShape.loc[ClipShape['reach_no'] == reachNum]
-
+        reachNum = row.loc['reach_no']
+        main_so = row.loc['geometry']
+        # workArea = ClipShape.loc[ClipShape['reach_no'] == reachNum]
+        # if main_so.geom_type != 'MultiPolygon':
+        #     main_so = MultiPolygon([main_so])
         try:
-            newgeom = main_so.difference(workArea['geometry'].values[0])
+            newgeom = main_so.difference(ClipShape['geometry'].values[0])
+
+            if newgeom.is_empty:
+                print("EMPTY_ERASE_GEOM")
+                newgeom = main_so
         except Exception as e:
             print(e)
             print('erase failed - returning non altered buffer for {0}'.format(reachNum))
             newgeom = main_so
 
-        mainShape.at[i, 'geometry']= newgeom
+        try:
+            geom_list.append(newgeom)
+            rn_list.append(reachNum)
+        except Exception as e:
+            print(e)
+            print("BREAK_{}!".format(count))
 
-
-        # print_progress(count, shpLen, prefix='Erase Water Areas{0}:'.format(process_name), suffix='Complete')
     print('Erase Water Areas - {0}: Completed'.format(process_name))
-    mainShape.crs = crs
-    return mainShape
-
-
-# def print_progress(iteration, total, prefix='', suffix='', decimals=1, bar_length=100):
-#     """
-#     Call in a loop to create terminal progress bar
-#     from https://gist.github.com/aubricus/f91fb55dc6ba5557fbab06119420dd6a
-#     @params:
-#         iteration   - Required  : current iteration (Int)
-#         total       - Required  : total iterations (Int)
-#         prefix      - Optional  : prefix string (Str)
-#         suffix      - Optional  : suffix string (Str)
-#         decimals    - Optional  : positive number of decimals in percent complete (Int)
-#         bar_length  - Optional  : character length of bar (Int)
-#     """
-#     str_format = "{0:." + str(decimals) + "f}"
-#     percents = str_format.format(100 * (iteration / float(total)))
-#     filled_length = int(round(bar_length * iteration / float(total)))
-#     bar = '█' * filled_length + '-' * (bar_length - filled_length)
-#
-#     sys.stdout.write('\r%s |%s| %s%s %s' % (prefix, bar, percents, '%', suffix)),
-#
-#     if iteration == total:
-#         sys.stdout.write('\n')
-#     sys.stdout.flush()
+    out_shape = gpd.GeoDataFrame(geometry=gpd.GeoSeries(geom_list))
+    out_shape['reach_no'] = rn_list
+    out_shape.crs = crs
+    print(out_shape)
+    return out_shape
 
 
 def paralellProcess(net_gdf, iw_area_shp, sb_DEM, DrAreaPathIn, coded_vegIn, proj_crs ):
+    # gdf = MainProcessing(iw_area_shp, sb_DEM, DrAreaPathIn, coded_vegIn, proj_crs, net_gdf.copy(), net_gdf)
+    # print("END-BREAK")
     n_feat = len(net_gdf)
     rowlim  = 1000
     num_cores = multiprocessing.cpu_count()
@@ -532,20 +546,16 @@ def paralellProcess(net_gdf, iw_area_shp, sb_DEM, DrAreaPathIn, coded_vegIn, pro
 
     pool = multiprocessing.Pool(num_cores)
 
-    function = partial(MainProcessing, iw_area_shp, sb_DEM, DrAreaPathIn, coded_vegIn, proj_crs)
-    gdf = pd.concat(pool.map(function, df_split))
+    function = partial(MainProcessing, iw_area_shp, sb_DEM, DrAreaPathIn, coded_vegIn, proj_crs, net_gdf.copy())
+    results = pool.map(function, df_split)
+
+    gdf = pd.concat(results)
 
     pool.close()
     pool.join()
+    gdf.plot(column='Str_order')
+    plt.show()
 
     return gdf
 
 
-# if __name__ == '__main__':
-#     main(
-#         sys.argv[1],
-#         sys.argv[2],
-#         sys.argv[3],
-#         sys.argv[4],
-#         sys.argv[5],
-#         sys.argv[6])

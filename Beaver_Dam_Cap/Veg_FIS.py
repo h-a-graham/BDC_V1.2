@@ -25,49 +25,8 @@ def main(in_network, scratch):
     net_gpd.loc[net_gpd['iVeg_40'] > 5, 'iVeg_40'] = 5
     net_gpd.loc[net_gpd['iVeg_10'] > 5, 'iVeg_10'] = 5
 
-    # arcpy.env.overwriteOutput = True
-
-    # #elif fis_type == "EX":
-    # cursor = arcpy.da.UpdateCursor(in_network, ["iVeg_100EX", "iVeg_10EX"])
-    # for row in cursor:
-    #     if row[0] < 0:
-    #         row[0] = 0
-    #         if row[1] < 0:
-    #             row[1] = 0
-    #         elif row[1] > 4.9:
-    #             row[1] = 4.9
-    #     elif row[0] > 4.9:  # updated by HG - now considers values up to 5
-    #         row[0] = 4.9
-    #         if row[1] < 0:
-    #             row[1] = 0
-    #         elif row[1] > 4.9:
-    #             row[1] = 4.9
-    #
-    #     elif row[1] < 0:
-    #         row[1] = 0
-    #
-    #     elif row[1] > 4.9:
-    #         row[1] = 4.9
-    #
-    #     else:
-    #         pass
-    #     cursor.updateRow(row)
-    # del row
-    # del cursor
-
-    # get arrays for fields of interest
-    # riparian_area_a = arcpy.da.FeatureClassToNumPyArray(in_network, "iVeg_100EX")
-    # streamside_a = arcpy.da.FeatureClassToNumPyArray(in_network, "iVeg_10EX")
     riparian_array = net_gpd['iVeg_40'].values
     streamside_array = net_gpd['iVeg_10'].values
-
-
-    # riparian_array = np.asarray(riparian_area_a, np.float64)
-    # streamside_array = np.asarray(streamside_a, np.float64)
-
-    # del riparian_area_a, streamside_a
-
-    # set up input and output ranges
 
     riparian = ctrl.Antecedent(np.arange(0, 5, 0.001), 'input1')
     streamside = ctrl.Antecedent(np.arange(0, 5, 0.001), 'input2')

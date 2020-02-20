@@ -1,16 +1,18 @@
 import sys
 import json
 import os
-# import arcpy
 import geopandas as gpd
-import pandas
+import pandas as pd
 import rasterio
 from rasterio.merge import merge
 from rasterio.mask import mask
 from rasterio.crs import CRS
 from shapely.geometry import box
-from shapely.geometry import LineString
+from shapely.ops import cascaded_union
 from datetime import datetime
+import earthpy as et
+import earthpy.clip as ec
+
 startTime = datetime.now()
 
 
@@ -25,16 +27,17 @@ def BDC_setup_main(rivers_root, dem_path, bvi_etc_root, operCatch, os_gridPath, 
         print("create export folder")
         os.makedirs(outRoot)
 
-    opCatch_gp = gpd.read_file(operCatch, driver="ESRI Shapefile")
+    opCatch_gp = gpd.read_file(operCatch)
     opCatch_gp.to_crs = ({'init': 'epsg:' + epsg_code})
     print(opCatch_gp.crs)
 
+
     # A better way of handling indexes would be nice but for now you must add manually.
-    # if 'id' in opCatch_gp.columns:
-    #     print("id column exists - continue")
-    # else:
-    #     print("id column does not exists - add one")
-    #     opCatch_gp['id'] = opCatch_gp.index + 1000
+    if 'id' in opCatch_gp.columns:
+        print("id column exists - continue")
+    else:
+        print("id column does not exists - add one")
+        opCatch_gp['id'] = opCatch_gp.index + 1000
 
 
     id_listA = list(opCatch_gp['id'])
@@ -50,13 +53,12 @@ def BDC_setup_main(rivers_root, dem_path, bvi_etc_root, operCatch, os_gridPath, 
         opCatSelec = opCatch_gp[opCatch_gp.id == area]
         opCatSelec.crs = ({'init': 'epsg:' + epsg_code})
         exp_path = os.path.join(outFolder,
-                                   "OC{0}_catchmentArea.shp".format(area))  # define the output shp file name
-        opCatSelec.to_file(exp_path,
-                            driver="ESRI Shapefile")
+                                   "OC{0}_catchmentArea.gpkg".format(area))  # define the output shp file name
+        opCatSelec.to_file(exp_path)
 
         coords, grid_List = get_extents(opCatSelec, os_gridPath, epsg_code)
 
-        get_rivs_arc(rivers_root, operCatch, grid_List, outFolder, area)
+        get_rivs_arc(rivers_root, opCatSelec, grid_List, outFolder, area)
         get_inWatArea(bvi_etc_root, opCatSelec, epsg_code, grid_List, outFolder, area)
         get_bvi(bvi_etc_root, epsg_code, coords, outFolder, area, grid_List, opCatSelec)
         get_dem(dem_path, epsg_code, coords, outFolder, area, grid_List, opCatSelec)
@@ -93,28 +95,30 @@ def getFeatures(gdf):
 def get_rivs_arc(riv_root, oc_shp, grid_list, outfold, hyd_num):
     print("extracting detailed river network features with Op Catch")
 
-    arcpy.env.overwriteOutput = True
-    # arcpy.Delete_management(r"in_memory")
-    gdb_name = 'tempo_GDB.gdb'
-    tempo_gdb = os.path.join(outfold, gdb_name)
-    if arcpy.Exists(tempo_gdb):
-        arcpy.Delete_management(tempo_gdb)
-    arcpy.CreateFileGDB_management(outfold, gdb_name)
+    # arcpy.env.overwriteOutput = True
+    # # arcpy.Delete_management(r"in_memory")
+    # gdb_name = 'tempo_GDB.gdb'
+    # tempo_gdb = os.path.join(outfold, gdb_name)
+    # if arcpy.Exists(tempo_gdb):
+    #     arcpy.Delete_management(tempo_gdb)
+    # arcpy.CreateFileGDB_management(outfold, gdb_name)
 
-    oc_area = arcpy.MakeFeatureLayer_management(oc_shp, "oc_selec", "", tempo_gdb)
-    with arcpy.da.SearchCursor(oc_area, ["id"]) as cursor:
-        for row in cursor:
-            if row[0] == hyd_num:
-                print(row[0])
-                expr = """{0} = {1}""".format('id', row[0])
-                print(expr)
-
-                arcpy.SelectLayerByAttribute_management(oc_area,
-                                                        "NEW_SELECTION",
-                                                        expr)
-                temp_zone = os.path.join(tempo_gdb, 'OS_tempZone')
-                oc_clip = arcpy.CopyFeatures_management(oc_area, temp_zone)
-
+    # oc_area = gpd.read_file(oc_shp)
+    oc_area = oc_shp.loc[oc_shp.id == hyd_num].copy()
+    oc_area.crs = oc_shp.crs
+    # oc_area = arcpy.MakeFeatureLayer_management(oc_shp, "oc_selec", "", tempo_gdb)
+    # with arcpy.da.SearchCursor(oc_area, ["id"]) as cursor:
+    #     for row in cursor:
+    #         if row[0] == hyd_num:
+    #             print(row[0])
+    #             expr = """{0} = {1}""".format('id', row[0])
+    #             print(expr)
+    #
+    #             arcpy.SelectLayerByAttribute_management(oc_area,
+    #                                                     "NEW_SELECTION",
+    #                                                     expr)
+    #             temp_zone = os.path.join(tempo_gdb, 'OS_tempZone')
+    #             oc_clip = arcpy.CopyFeatures_management(oc_area, temp_zone)
 
     river_list = []
     count = 0
@@ -126,29 +130,38 @@ def get_rivs_arc(riv_root, oc_shp, grid_list, outfold, hyd_num):
             if x[-4:] == '.shp':
                 count += 1
                 shp_file = os.path.join(path, x)
-                temp_rivs = os.path.join(tempo_gdb, 'temp_rivs{0}'.format(count))
-                arcpy.Clip_analysis(shp_file, oc_clip, temp_rivs)
-                river_list.append(temp_rivs)
+                riv_gpd = gpd.read_file(shp_file)
+                # temp_rivs = os.path.join(tempo_gdb, 'temp_rivs{0}'.format(count)
 
-    export_path = os.path.join(outfold, "OC{0}_MM_rivers.shp".format(hyd_num))
+                if oc_area.loc[0, 'geometry'].is_valid is False: # fixes catchment if geometery is invalid
+                    oc_area.loc[0, 'geometry'] = oc_area.loc[0, 'geometry'].buffer(0)
+                rivs_clipped = ec.clip_shp(riv_gpd, oc_area)
+                # Remove empty geometries
+                rivs_clipped = rivs_clipped[~rivs_clipped.is_empty]
+
+                river_list.append(rivs_clipped)
+
+    # export_path = os.path.join(outfold, "OC{0}_MM_rivers.shp".format(hyd_num))
 
 
 
     if len(river_list) > 1:
         # temp_rivs = os.path.join(tempo_gdb, 'temp_rivs')
         print("merging clipped features")
-        arcpy.Merge_management(river_list, export_path)
+        riv_masked = gpd.GeoDataFrame(pd.concat(river_list, ignore_index=True))
 
         # print("clipping features")
         # arcpy.Clip_analysis(temp_rivs, oc_clip, export_path)
     else:
         print("copying features")
-        arcpy.CopyFeatures_management(river_list[0], export_path)
-        # arcpy.Clip_analysis(river_list[0], oc_clip, export_path)
 
-    # arcpy.Delete_management(r"in_memory")
-    if arcpy.Exists(tempo_gdb):
-        arcpy.Delete_management(tempo_gdb)
+        riv_masked = river_list[0]
+        # arcpy.CopyFeatures_management(river_list[0], export_path)
+        # arcpy.Clip_analysis(river_list[0], oc_clip, export_path)
+    export_path = os.path.join(outfold, "OC{0}_MM_rivers.gpkg".format(hyd_num))
+
+    riv_masked.to_file(export_path)
+
 
 
 def get_inWatArea(root, oc_ha, epsg, grid_list, outfold, hyd_num):
@@ -164,7 +177,7 @@ def get_inWatArea(root, oc_ha, epsg, grid_list, outfold, hyd_num):
                 shp_file = os.path.join(path, x)
                 water_list.append(shp_file)
 
-    inwaterA_gp = pandas.concat([
+    inwaterA_gp = pd.concat([
         gpd.read_file(shp)
         for shp in water_list
     ], sort=True).pipe(gpd.GeoDataFrame)
@@ -172,9 +185,8 @@ def get_inWatArea(root, oc_ha, epsg, grid_list, outfold, hyd_num):
 
     inwaterB_gp = gpd.overlay(inwaterA_gp, oc_ha, how='intersection')
 
-    export_path = os.path.join(outfold, "OC{0}_OS_InWater.shp".format(hyd_num))  # define the output shp file name
-    inwaterB_gp.to_file(export_path,
-                       driver="ESRI Shapefile")
+    export_path = os.path.join(outfold, "OC{0}_OS_InWater.gpkg".format(hyd_num))  # define the output shp file name
+    inwaterB_gp.to_file(export_path)
 
 def get_bvi(root, epsg, coords, outfold, hyd_num, grid_list, work_hydAr):
     print("extracting Beaver Veg. Index within Op Catch")

@@ -1,20 +1,21 @@
-from arcpy.sa import *
-import arcpy
+
 from datetime import datetime
 import os
 import sys
-
-
+import rasterio
+import geopandas as gpd
+from rasterio import features
+import subprocess
+import numpy as np
+import shutil
+from matplotlib import pyplot as plt
+import pandas as pd
 
 ############# START TIME ##############
 startTime = datetime.now()
 
 
-def main(path, scratch_gdb, seg_network_a, DEM_orig):
-
-    arcpy.env.overwriteOutput = True
-    arcpy.CheckOutExtension("spatial")
-    arcpy.env.scratchworkspace = r"in_memory" #scratch_gdb
+def main(path, scratch_gdb, seg_network_a, DEM_orig, epsg):
 
     print(startTime)
 
@@ -25,25 +26,32 @@ def main(path, scratch_gdb, seg_network_a, DEM_orig):
 
     print("Run Stream Burn Process")
 
-    stream_burn_dem, net_raster, sb_DEM = streamBurning(DEM_orig, scratch_gdb, seg_network_a, path, home_name)
+    stream_burn_dem, net_raster, ras_meta, riv_gdf = streamBurning(DEM_orig, scratch_gdb, seg_network_a, path, home_name)
 
     print("Run Flow Accumulation / Drainage area raster Process")
+    flowacc, strord_lines = run_grass(scratch_gdb, stream_burn_dem)
 
-    DrAreaPath, FlowDir = calc_drain_area(stream_burn_dem, scratch_gdb, DEM_orig)
+    acc_to_contarea(DEM_orig, flowacc)
+
 
     print("Run Stream Order Polygon Generation")
 
-    if arcpy.Exists(scratch_gdb + "/seg_network_b"):
+    reaches_out = os.path.join(scratch_gdb, "seg_network_b.gpkg")
+
+    if os.path.isfile(reaches_out):
         print("stream ordering alredy done...")
-        seg_network_b = scratch_gdb + "/seg_network_b"
+
     else:
-        seg_network_b = get_stream_order(scratch_gdb, stream_burn_dem, seg_network_a, DEM_orig, FlowDir, net_raster)
+        seg_net_gdf =join_str_order(riv_gdf, strord_lines)
+        seg_net_gdf.crs = ({'init': 'epsg:' + epsg})
+        seg_net_gdf.to_file(reaches_out)
+
 
     finTime = datetime.now() - startTime
-    print("BDC table script completed. \n"
+    print("BDC Terrain completed. \n"
           "Processing time = {0}".format(finTime))
 
-    return seg_network_b
+    return reaches_out
 
 ################################################################################################
 ###################### NOW TIME FOR STREAM BURNING ###############################
@@ -51,154 +59,117 @@ def main(path, scratch_gdb, seg_network_a, DEM_orig):
 
 def streamBurning(DEM_orig, scratch_gdb, seg_network_a, home, home_name):
     print ("stream burning process")
-    arcpy.CalculateStatistics_management(DEM_orig)
 
-    dem_orig_b = Con(IsNull(DEM_orig), 0, DEM_orig)
-    dem_orig_b.save(scratch_gdb + "/DEM_square")
+    riv_vec = gpd.read_file(seg_network_a)
 
-    # set up river network raster
-    network_raster = scratch_gdb + "/network_raster"
+    with rasterio.open(DEM_orig) as dem:
+        meta = dem.meta.copy()
+        meta.update(compress='lzw')
+        dem_arr = dem.read(1)
 
-    arcpy.env.extent = dem_orig_b
-    arcpy.env.cellsize = dem_orig_b
-    arcpy.env.snapRaster = dem_orig_b
-    arcpy.env.outputCoordinateSystem = dem_orig_b
+    riv_ras = os.path.join(scratch_gdb, "{0}Riv_Ras.tif".format(home_name))
 
-    print('convert network to raster')
-    net_fields = [f.name for f in arcpy.ListFields(seg_network_a)]
-    if "burn_val" in net_fields:
-        arcpy.DeleteField_management(seg_network_a, "burn_val")
-    del net_fields
-    arcpy.AddField_management(seg_network_a, "burn_val", "SHORT")
-    arcpy.CalculateField_management(seg_network_a, "burn_val", "10") #
+    with rasterio.open(riv_ras, 'w+', **meta) as out:
+        out_arr = out.read(1)
 
-    arcpy.FeatureToRaster_conversion(seg_network_a, "burn_val", network_raster,
-                                     dem_orig_b)  # THINK IT IS WORTH CHANGING THE ATTRIBUTE VALUE
 
-    network_raster_a = Con(IsNull(network_raster), 0, 30)  # changed to 30 to see if it improves stream ordering
-    network_raster_a.save(scratch_gdb + "/net_ras_fin")
-    arcpy.ResetEnvironments()
+        # this is where we create a generator of geom, value pairs to use in rasterizing
+        shapes = (geom for geom in riv_vec.geometry)
 
-    # This is just a map algebra thing to replace the stuff above that uses numpy (the numpy stuff works but is
-    # limited in terms of how much it can process.
-    print("stream burning DEM")
-    rivers_ting = Raster(scratch_gdb + "/net_ras_fin")
-    dem_ting = Raster(scratch_gdb + "/DEM_square")
+        features.rasterize(shapes=shapes, fill=0, out=out_arr, transform=out.transform,
+                                    all_touched=True)
+        print(np.max(out_arr))
+        print(np.min(out_arr))
 
-    stream_burn_dem_a = dem_ting - rivers_ting
-    stream_burn_dem_a.save(scratch_gdb + "/raster_burn")
+        out.write_band(1, out_arr)
+
 
     sb_DEM = os.path.join(home, "{0}strBurndDEm.tif".format(home_name))
 
-    arcpy.CopyRaster_management(scratch_gdb + "/raster_burn", sb_DEM)
+    with rasterio.open(sb_DEM, 'w+', **meta) as out:
+        dem_arr[out_arr == 1] = dem_arr[out_arr == 1] - 50
+        out.write_band(1, dem_arr)
 
-    print("stream burning complete")
-    return stream_burn_dem_a, network_raster, sb_DEM
+    return sb_DEM, riv_ras, meta, riv_vec
+
+def run_grass(scratch_gdb, burn_dem):
+    print("set up to run terrain processing in GRASS GIS")
+    scriptHome = os.path.dirname(__file__)
+
+    wrkdir = os.path.join(scriptHome, 'grass_processing')
+    if os.path.isdir(wrkdir):
+        try:
+            shutil.rmtree(wrkdir)
+        except PermissionError as e:
+            print(e)
+
+    out_lines = os.path.join(scratch_gdb, "st_ord_line.gpkg")
+    out_flwacc = os.path.join(scratch_gdb, "flwacc.tif")
+    command = os.path.abspath("C:/OSGeo4W64/OSGeo4W.bat")
 
 
-############################################################################################
-###################### Drainage area calcs ##################################################
-############################################################################################
+    init_script = os.path.join(scriptHome, 'grass_scripts', 'grass_initiate.bat')
+    run_script = os.path.join(scriptHome, 'grass_scripts', 'grass_streamorder.bat')
+    # print(scriptHome)
+    # myscript_loc = os.path.join(scriptHome, "Stream_Order_Sub.py")
 
-def calc_drain_area(stream_burn_dem, scratch_gdb, DEM_orig):
+    args = [wrkdir, run_script, burn_dem, out_lines, out_flwacc]
+    # print(args)
+    cmd = [command, init_script] + args
 
-    print("running drainage area calc process")
-    DEMdesc = arcpy.Describe(stream_burn_dem)
-    height = DEMdesc.meanCellHeight
-    width = DEMdesc.meanCellWidth
-    res = height * width
-    resolution = int(res)
+    subprocess.call(cmd, universal_newlines=True)
 
-    # derive a flow accumulation raster from input DEM and covert to units of square kilometers
-    print ("filling sinks in DEM")
-    filled_DEM = Fill(stream_burn_dem, "")
-    filled_DEM.save(scratch_gdb + "/fill_dem")
-    print ("running flow direction raster")
+    return out_flwacc, out_lines
 
-    flow_direction = FlowDirection(filled_DEM, "NORMAL", "")
-    flow_direction.save(scratch_gdb + "/flow_dir")
-    print ("running flow accumulation raster")
-    flow_accumulation = FlowAccumulation(flow_direction, "", "FLOAT")
-    print("convert flow accumulation to drainage area")
-    DrainArea = flow_accumulation * resolution / 1000000
+def acc_to_contarea(DEM_orig, flwacc_path):
+    print("converting n cells to contributing area")
+
+    with rasterio.open(flwacc_path, 'r') as flw:
+        flowacc = flw.read(1)
+        meta = flw.meta
+
+    meta.update(dtype="float32")
+    res = abs(meta.get('transform')[0])
+    drain_area = (flowacc * (res*res) / 1000000).astype(dtype='float32')
 
     DEM_dirname = os.path.dirname(DEM_orig)
-
-    if os.path.exists(DEM_dirname + "/DrainArea_sqkm.tif"):
-        arcpy.Delete_management(DEM_dirname + "/DrainArea_sqkm.tif")
-        DrArea_path = DEM_dirname + "/DrainArea_sqkm.tif"
-        DrainArea.save(DrArea_path)
-    else:
-        DrArea_path = DEM_dirname + "/DrainArea_sqkm.tif"
-        DrainArea.save(DrArea_path)
-
-    print("drainage area Raster completed")
-    return DrArea_path, flow_direction
+    DrArea_path = os.path.join(DEM_dirname, "DrainArea_sqkm.tif")
+    with rasterio.open(DrArea_path, 'w', **meta) as cont:
+        cont.write_band(1, drain_area)
 
 
-###############################################################################
-################# STREAM ORDERING ############################################
-###############################################################################
-def get_stream_order(scratch_gdb, stream_burn_dem, seg_network_a, DEM_orig, FlowDir, net_raster):
+def join_str_order(streams_gdf, str_ord_lines):
 
-    orderMethod = "STRAHLER"
+    so_gdf = gpd.read_file(str_ord_lines)
 
-    print("running Stream order")
-    outStreamOrder = StreamOrder(net_raster, FlowDir, orderMethod)
 
-    strord_path = scratch_gdb + "/streamord_out"
-    outStreamOrder.save(strord_path)
+    riv_centroids = streams_gdf.copy()
+    riv_centroids['join_key'] = riv_centroids.index
+    riv_centroids['geometry'] = riv_centroids['geometry'].centroid
+    riv_centroids['geometry'] = riv_centroids['geometry'].buffer(15)
 
-    print("fixing dodgy first order streams")
-    str_ras = Raster(strord_path)
-    Cor_Str_Ord_b = Con(str_ras == 1, 1, str_ras - 1)
+    streams_so_join = gpd.sjoin(riv_centroids, so_gdf, how='left', op='intersects', lsuffix='left',
+                             rsuffix='right')
+    print(streams_so_join)
+    streams_gdf['join_key'] = streams_gdf.index
+    streams_so_join = streams_gdf.merge(streams_so_join, on='join_key', how='left')
 
-    Cor_Str_Ord = scratch_gdb + "/Cor_Str_Ord"
-    Cor_Str_Ord_b.save(Cor_Str_Ord)
+    streams_so_join = gpd.GeoDataFrame(streams_so_join[['reach_leng_x', 'strahler']],
+                                       geometry=gpd.GeoSeries(streams_so_join['geometry_x']))
 
-    max_val = arcpy.GetRasterProperties_management(Cor_Str_Ord, "MAXIMUM")
-    int_max_val = int(max_val.getOutput(0)) + 1
-    val_range = list(range(2, int_max_val))
+    streams_so_join = streams_so_join.rename(columns={"strahler": "Str_order"})
+    streams_so_join = streams_so_join.rename(columns={"reach_leng_x": "reach_leng"})
+    streams_so_join["Str_order"] = streams_so_join["Str_order"].fillna(value=1)
 
-    print("expand values to remove 1st order errors")
-    str_ord_exp = Expand(Cor_Str_Ord, 1, val_range)
+    return streams_so_join
 
-    str_ord_exp_path = (scratch_gdb + "/str_ord_exp")
-    str_ord_exp.save(str_ord_exp_path)
-
-    print("convert Raster to Polygon")
-    str_ord_exp_poly = scratch_gdb + "/st_or_ex_poly"
-    arcpy.RasterToPolygon_conversion(str_ord_exp_path, str_ord_exp_poly, "NO_SIMPLIFY", "Value")
-
-    net_fields = [f.name for f in arcpy.ListFields(seg_network_a)]
-    if "Str_order" in net_fields:
-        arcpy.DeleteField_management(seg_network_a, "Str_order")
-    if "gridcode" in net_fields:
-        arcpy.DeleteField_management(seg_network_a, "gridcode")
-    del net_fields
-
-    print ("join network and StrOrd Polygon fields")
-    seg_network_b = scratch_gdb + "/seg_network_b"
-
-    arcpy.SpatialJoin_analysis(seg_network_a, str_ord_exp_poly, seg_network_b, "JOIN_ONE_TO_ONE", "KEEP_ALL", "",
-                               "HAVE_THEIR_CENTER_IN")
-
-    arcpy.AddField_management(seg_network_b, "Str_order", "SHORT")
-
-    with arcpy.da.UpdateCursor(seg_network_b, ["Str_order", "gridcode"]) as cursor:
-        for row in cursor:
-            row[0] = row[1]
-            cursor.updateRow(row)
-    del row
-    del cursor
-
-    arcpy.DeleteField_management(seg_network_b, "gridcode")
-
-    return seg_network_b
 
 if __name__ == '__main__':
-    main(
+        main(
         sys.argv[1],
         sys.argv[2],
         sys.argv[3],
-        sys.argv[4],)
+        sys.argv[4],
+        sys.argv[5])
+
+
