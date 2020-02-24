@@ -150,8 +150,13 @@ def join_str_order(streams_gdf, str_ord_lines):
 
     riv_centroids = streams_gdf.copy()
     riv_centroids['join_key'] = riv_centroids.index
-    riv_centroids['geometry'] = riv_centroids['geometry'].centroid
-    riv_centroids['geometry'] = riv_centroids['geometry'].buffer(15)
+
+    # riv_centroids['geometry'] = riv_centroids['geometry'].centroid
+
+    riv_centroids['geometry'] = [x.interpolate(x.length / 2) for x in riv_centroids['geometry']]
+
+
+    riv_centroids['geometry'] = riv_centroids['geometry'].buffer(10)
 
     streams_so_join = gpd.sjoin(riv_centroids, so_gdf, how='left', op='intersects', lsuffix='left',
                              rsuffix='right')

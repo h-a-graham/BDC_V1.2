@@ -27,6 +27,7 @@ def main():
     # operCatch = os.path.abspath('C:/HG_Projects/Hugh_BDC_Files/new_Version_testing/in_shps/r_otter_area_0002.gpkg')
     # operCatch = os.path.abspath('C:/HG_Projects/Hugh_BDC_Files/new_Version_testing/in_shps/CH_area_0001.gpkg')
     # operCatch = os.path.abspath('C:/HG_Projects/Hugh_BDC_Files/Alan_BDC/Alan_Batch_gpkg/Ma_catch_3089.gpkg')
+    # operCatch = os.path.abspath('C:/HG_Projects/Hugh_BDC_Files/Alan_BDC/Alan_Batch_gpkg/Ma_catch_3085.gpkg')
 
     operCatch = os.path.abspath('C:/HG_Projects/Hugh_BDC_Files/Alan_BDC/Alan_Batch_gpkg/Ma_catchments_All.gpkg')
     # operCatch = os.path.abspath('C:/HG_Projects/Hugh_BDC_Files/Alan_BDC/Alan_Batch_gpkg/Ma_catch_3036.gpkg')
@@ -39,9 +40,9 @@ def main():
     # outRoot = os.path.abspath("D:/HG_Work/GB_Beaver_Data/ENGLAND_BDC_Out") # Need to try again
     # outRoot = os.path.abspath("D:/HG_Work/GB_Beaver_Data/NRW_Severn_Out")
     # outRoot = os.path.abspath("C:/HG_Projects/Hugh_BDC_Files/new_Version_testing/Tamar_Test")
-    # outRoot = os.path.abspath("C:/HG_Projects/Hugh_BDC_Files/new_Version_testing/Exp_folder")
+    # outRoot = os.path.abspath("C:/HG_Projects/Hugh_BDC_Files/new_Version_testing/SW_Lakes_Testing")
 
-    outRoot = os.path.abspath('C:/HG_Projects/Hugh_BDC_Files/Alan_BDC/Batch_Job0220')
+    outRoot = os.path.abspath('C:/HG_Projects/Hugh_BDC_Files/Alan_BDC/Batch_Job0220_V2')
     # outRoot = os.path.abspath('C:/HG_Projects/Hugh_BDC_Files/Alan_BDC/3036_test')
 
     epsg_code = str(27700)
