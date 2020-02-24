@@ -29,6 +29,7 @@ def main():
     # operCatch = os.path.abspath('C:/HG_Projects/Hugh_BDC_Files/Alan_BDC/Alan_Batch_gpkg/Ma_catch_3089.gpkg')
 
     operCatch = os.path.abspath('C:/HG_Projects/Hugh_BDC_Files/Alan_BDC/Alan_Batch_gpkg/Ma_catchments_All.gpkg')
+    # operCatch = os.path.abspath('C:/HG_Projects/Hugh_BDC_Files/Alan_BDC/Alan_Batch_gpkg/Ma_catch_3036.gpkg')
 
     cehHydArea = os.path.abspath("C:/HG_Projects/Hugh_BDC_Files/GB_Beaver_modelling/EA_catchments/"
                                  "FME_656D6600_1568991385841_5210/temp/hyd_areas.shp")
@@ -39,12 +40,14 @@ def main():
     # outRoot = os.path.abspath("D:/HG_Work/GB_Beaver_Data/NRW_Severn_Out")
     # outRoot = os.path.abspath("C:/HG_Projects/Hugh_BDC_Files/new_Version_testing/Tamar_Test")
     # outRoot = os.path.abspath("C:/HG_Projects/Hugh_BDC_Files/new_Version_testing/Exp_folder")
+
     outRoot = os.path.abspath('C:/HG_Projects/Hugh_BDC_Files/Alan_BDC/Batch_Job0220')
+    # outRoot = os.path.abspath('C:/HG_Projects/Hugh_BDC_Files/Alan_BDC/3036_test')
 
     epsg_code = str(27700)
 
     prep_only = False
-    skip_prep = True
+    skip_prep = False
 
     if skip_prep is False:
         print("running data prep script to organise inputs for all target Dam Capacity Areas/ Catchments")

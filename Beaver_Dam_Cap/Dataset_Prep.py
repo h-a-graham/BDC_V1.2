@@ -7,12 +7,12 @@ import rasterio
 from rasterio.merge import merge
 from rasterio.mask import mask
 from rasterio.crs import CRS
-from shapely.geometry import box
-from shapely.ops import cascaded_union
+from shapely.geometry import box, LineString
+# from shapely.ops import cascaded_union
 from datetime import datetime
-import earthpy as et
-import earthpy.clip as ec
-
+# import earthpy as et
+# import earthpy.clip as ec
+from matplotlib import pyplot as plt
 startTime = datetime.now()
 
 
@@ -95,30 +95,10 @@ def getFeatures(gdf):
 def get_rivs_arc(riv_root, oc_shp, grid_list, outfold, hyd_num):
     print("extracting detailed river network features with Op Catch")
 
-    # arcpy.env.overwriteOutput = True
-    # # arcpy.Delete_management(r"in_memory")
-    # gdb_name = 'tempo_GDB.gdb'
-    # tempo_gdb = os.path.join(outfold, gdb_name)
-    # if arcpy.Exists(tempo_gdb):
-    #     arcpy.Delete_management(tempo_gdb)
-    # arcpy.CreateFileGDB_management(outfold, gdb_name)
-
-    # oc_area = gpd.read_file(oc_shp)
     oc_area = oc_shp.loc[oc_shp.id == hyd_num].copy()
+    oc_area = oc_area.reset_index()
     oc_area.crs = oc_shp.crs
-    # oc_area = arcpy.MakeFeatureLayer_management(oc_shp, "oc_selec", "", tempo_gdb)
-    # with arcpy.da.SearchCursor(oc_area, ["id"]) as cursor:
-    #     for row in cursor:
-    #         if row[0] == hyd_num:
-    #             print(row[0])
-    #             expr = """{0} = {1}""".format('id', row[0])
-    #             print(expr)
-    #
-    #             arcpy.SelectLayerByAttribute_management(oc_area,
-    #                                                     "NEW_SELECTION",
-    #                                                     expr)
-    #             temp_zone = os.path.join(tempo_gdb, 'OS_tempZone')
-    #             oc_clip = arcpy.CopyFeatures_management(oc_area, temp_zone)
+
 
     river_list = []
     count = 0
@@ -127,19 +107,31 @@ def get_rivs_arc(riv_root, oc_shp, grid_list, outfold, hyd_num):
         shp_test = os.listdir(path)
         for x in shp_test:
             # count += 1
-            if x[-4:] == '.shp':
+            if x[-5:] == '.gpkg':
                 count += 1
                 shp_file = os.path.join(path, x)
                 riv_gpd = gpd.read_file(shp_file)
                 # temp_rivs = os.path.join(tempo_gdb, 'temp_rivs{0}'.format(count)
 
-                if oc_area.loc[0, 'geometry'].is_valid is False: # fixes catchment if geometery is invalid
-                    oc_area.loc[0, 'geometry'] = oc_area.loc[0, 'geometry'].buffer(0)
-                rivs_clipped = ec.clip_shp(riv_gpd, oc_area)
+                try:
+                    if oc_area.loc[0, 'geometry'].is_valid is False: # fixes catchment if geometery is invalid
+                        oc_area.loc[0, 'geometry'] = oc_area.loc[0, 'geometry'].buffer(0)
+                except Exception as e:
+                    print("BREAK")
+                # geom_list = []
+                # for idx, row in riv_gpd.iterrows():
+                #     g = LineString([xy[0:2] for xy in list(riv_gpd.loc[idx, 'geometry'].coords)])
+                #     geom_list.append(g)
+
+                rivs_clipped = clip(riv_gpd, oc_area)
+
+                # rivs_clipped = ec.clip_shp(riv_gpd, oc_area)
                 # Remove empty geometries
-                rivs_clipped = rivs_clipped[~rivs_clipped.is_empty]
+                # rivs_clipped = rivs_clipped[~rivs_clipped.is_empty]
 
                 river_list.append(rivs_clipped)
+
+
 
     # export_path = os.path.join(outfold, "OC{0}_MM_rivers.shp".format(hyd_num))
 
@@ -150,17 +142,22 @@ def get_rivs_arc(riv_root, oc_shp, grid_list, outfold, hyd_num):
         print("merging clipped features")
         riv_masked = gpd.GeoDataFrame(pd.concat(river_list, ignore_index=True))
 
-        # print("clipping features")
-        # arcpy.Clip_analysis(temp_rivs, oc_clip, export_path)
     else:
         print("copying features")
 
         riv_masked = river_list[0]
-        # arcpy.CopyFeatures_management(river_list[0], export_path)
-        # arcpy.Clip_analysis(river_list[0], oc_clip, export_path)
+
     export_path = os.path.join(outfold, "OC{0}_MM_rivers.gpkg".format(hyd_num))
 
     riv_masked.to_file(export_path)
+
+    # pd.set_option('display.max_rows', 500)
+    # pd.set_option('display.max_columns', 500)
+    # pd.set_option('display.width', 1000)
+    # riv_masked.head()
+    # ax = riv_masked.plot()
+    # oc_area.plot(ax=ax, color='None', edgecolor='black')
+    # plt.show()
 
 
 
@@ -222,7 +219,6 @@ def get_bvi(root, epsg, coords, outfold, hyd_num, grid_list, work_hydAr):
             src = rasterio.open(fp)
             mosaic, out_trans = mask(dataset=src, shapes=coords, crop=True)
 
-    # out_img, out_transform = mask(dataset=mosaic, shapes=coords, crop=True)
 
     out_meta = src.meta.copy()
 
@@ -273,9 +269,6 @@ def get_dem(dem_root,epsg, coords, outfold, hyd_num, grid_list, work_hydAr):
         mosaic, out_trans = mask(dataset=src, shapes=coords, crop=True)
 
 
-
-    # out_img, out_transform = mask(dataset=mosaic, shapes=coords, crop=True)
-
     out_meta = src.meta.copy()
 
     out_meta.update(
@@ -292,13 +285,25 @@ def get_dem(dem_root,epsg, coords, outfold, hyd_num, grid_list, work_hydAr):
 
     maskedRas = rasterio.open(out_ras)
 
-    # hydAr_gj = gpd.GeoSeries([work_hydAr]).__geo_interface__
     hydAr_gj = getFeatures(work_hydAr)
     mosaicb, otb = mask(dataset=maskedRas, shapes=hydAr_gj, crop=False, nodata=(-100), all_touched=False)
 
     with rasterio.open(out_ras, "w", **out_meta) as dest:
         dest.write(mosaicb)
 
+def clip(to_clip, clip_shp):
+    """Alternative clip function"""
+    union = gpd.GeoDataFrame(
+        gpd.GeoSeries([clip_shp.unary_union]),
+        columns=['geometry'],
+        crs=clip_shp.crs
+    )
+
+    clip_gdf = gpd.sjoin(to_clip, union, op='intersects')
+    clip_gdf = clip_gdf.drop(columns=['index_right'])
+
+    return clip_gdf
+    # return gpd.overlay(to_clip, union, how='intersection')
 
 
 if __name__ == '__main__':
