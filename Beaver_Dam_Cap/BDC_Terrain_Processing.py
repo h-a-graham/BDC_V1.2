@@ -29,7 +29,7 @@ def main(path, scratch_gdb, seg_network_a, DEM_orig, epsg):
     stream_burn_dem, net_raster, ras_meta, riv_gdf = streamBurning(DEM_orig, scratch_gdb, seg_network_a, path, home_name)
 
     print("Run Flow Accumulation / Drainage area raster Process")
-    flowacc, strord_lines = run_grass(scratch_gdb, stream_burn_dem)
+    flowacc, strord_lines, grass_dir = run_grass(scratch_gdb, stream_burn_dem)
 
     acc_to_contarea(DEM_orig, flowacc)
 
@@ -46,6 +46,11 @@ def main(path, scratch_gdb, seg_network_a, DEM_orig, epsg):
         seg_net_gdf.crs = ({'init': 'epsg:' + epsg})
         seg_net_gdf.to_file(reaches_out)
 
+    if os.path.isdir(grass_dir):
+        try:
+            shutil.rmtree(grass_dir)
+        except PermissionError as e:
+            print(e)
 
     finTime = datetime.now() - startTime
     print("BDC Terrain completed. \n"
@@ -119,7 +124,7 @@ def run_grass(scratch_gdb, burn_dem):
 
     subprocess.call(cmd, universal_newlines=True)
 
-    return out_flwacc, out_lines
+    return out_flwacc, out_lines, wrkdir
 
 def acc_to_contarea(DEM_orig, flwacc_path):
     print("converting n cells to contributing area")
