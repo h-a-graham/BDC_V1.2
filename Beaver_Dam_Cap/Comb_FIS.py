@@ -16,8 +16,8 @@ import geopandas as gpd
 
 
 def main(in_network, scratch):
-    max_DA_thresh = 100
-    max_Width_thresh = 25
+    max_DA_thresh = 75
+    max_Width_thresh = 20
 
 
     net_gpd = gpd.read_file(in_network, driver="ESRI Shapefile")

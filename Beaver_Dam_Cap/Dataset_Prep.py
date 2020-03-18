@@ -8,10 +8,9 @@ from rasterio.merge import merge
 from rasterio.mask import mask
 from rasterio.crs import CRS
 from shapely.geometry import box, LineString
-# from shapely.ops import cascaded_union
+import shutil
 from datetime import datetime
-# import earthpy as et
-# import earthpy.clip as ec
+
 from matplotlib import pyplot as plt
 startTime = datetime.now()
 
@@ -50,18 +49,33 @@ def BDC_setup_main(rivers_root, dem_path, bvi_etc_root, operCatch, os_gridPath, 
         else:
             print("create OS Grid folder folder")
             os.makedirs(outFolder)
+
+        # scratch = os.path.join(outFolder, 'scratch')
+        #
+        # if os.path.exists(scratch):
+        #     shutil.rmtree(scratch)
+        #     os.mkdir(scratch)
+        # else:
+        #     os.mkdir(scratch)
+
+
         opCatSelec = opCatch_gp[opCatch_gp.id == area]
         opCatSelec.crs = ({'init': 'epsg:' + epsg_code})
         exp_path = os.path.join(outFolder,
-                                   "OC{0}_catchmentArea.gpkg".format(area))  # define the output shp file name
-        opCatSelec.to_file(exp_path)
+                                   "OC{0}_catchmentArea.shp".format(area))  # define the output shp file name
+        opCatSelec.to_file(exp_path, driver='ESRI Shapefile')
 
         coords, grid_List = get_extents(opCatSelec, os_gridPath, epsg_code)
 
-        get_rivs_arc(rivers_root, opCatSelec, grid_List, outFolder, area)
+        get_rivs_arc(rivers_root, opCatSelec, grid_List, outFolder, area, epsg_code)
         get_inWatArea(bvi_etc_root, opCatSelec, epsg_code, grid_List, outFolder, area)
         get_bvi(bvi_etc_root, epsg_code, coords, outFolder, area, grid_List, opCatSelec)
         get_dem(dem_path, epsg_code, coords, outFolder, area, grid_List, opCatSelec)
+
+        # if os.path.exists(scratch):
+        #     shutil.rmtree(scratch)
+
+
 
     print("script finished at {0}".format(datetime.now()))
     print("Total Run Time = {0}".format(datetime.now() - startTime))
@@ -92,13 +106,12 @@ def getFeatures(gdf):
     return [json.loads(gdf.to_json())['features'][0]['geometry']]
 
 
-def get_rivs_arc(riv_root, oc_shp, grid_list, outfold, hyd_num):
+def get_rivs_arc(riv_root, oc_shp, grid_list, outfold, hyd_num, epsg):
     print("extracting detailed river network features with Op Catch")
 
     oc_area = oc_shp.loc[oc_shp.id == hyd_num].copy()
     oc_area = oc_area.reset_index()
     oc_area.crs = oc_shp.crs
-
 
     river_list = []
     count = 0
@@ -118,18 +131,14 @@ def get_rivs_arc(riv_root, oc_shp, grid_list, outfold, hyd_num):
                         oc_area.loc[0, 'geometry'] = oc_area.loc[0, 'geometry'].buffer(0)
                 except Exception as e:
                     print("BREAK")
-                # geom_list = []
-                # for idx, row in riv_gpd.iterrows():
-                #     g = LineString([xy[0:2] for xy in list(riv_gpd.loc[idx, 'geometry'].coords)])
-                #     geom_list.append(g)
 
                 rivs_clipped = clip(riv_gpd, oc_area)
 
-                # rivs_clipped = ec.clip_shp(riv_gpd, oc_area)
-                # Remove empty geometries
-                # rivs_clipped = rivs_clipped[~rivs_clipped.is_empty]
+                # temp_file = os.path.join(scratch, 'tempfile{0}.shp'.format(count))
+                # rivs_clipped.to_file(temp_file)
 
                 river_list.append(rivs_clipped)
+                # rivs_clipped = None
 
 
 
@@ -142,14 +151,23 @@ def get_rivs_arc(riv_root, oc_shp, grid_list, outfold, hyd_num):
         print("merging clipped features")
         riv_masked = gpd.GeoDataFrame(pd.concat(river_list, ignore_index=True))
 
+        # riv_masked = pd.concat([
+        #     gpd.read_file(shp)
+        #     for shp in river_list], sort=True).pipe(gpd.GeoDataFrame)
+
     else:
         print("copying features")
 
         riv_masked = river_list[0]
 
-    export_path = os.path.join(outfold, "OC{0}_MM_rivers.gpkg".format(hyd_num))
+    riv_masked.crs = ({'init': 'epsg:' + epsg})
 
-    riv_masked.to_file(export_path)
+    rivs_clipped = None
+    river_list = None
+
+    export_path = os.path.join(outfold, "OC{0}_MM_rivers.shp".format(hyd_num))
+
+    riv_masked.to_file(export_path, driver='ESRI Shapefile')
 
     # pd.set_option('display.max_rows', 500)
     # pd.set_option('display.max_columns', 500)
@@ -178,12 +196,17 @@ def get_inWatArea(root, oc_ha, epsg, grid_list, outfold, hyd_num):
         gpd.read_file(shp)
         for shp in water_list
     ], sort=True).pipe(gpd.GeoDataFrame)
+
+    water_list = None
+
     inwaterA_gp.crs = ({'init': 'epsg:' + epsg})
 
     inwaterB_gp = gpd.overlay(inwaterA_gp, oc_ha, how='intersection')
 
-    export_path = os.path.join(outfold, "OC{0}_OS_InWater.gpkg".format(hyd_num))  # define the output shp file name
-    inwaterB_gp.to_file(export_path)
+    inwaterA_gp = None
+
+    export_path = os.path.join(outfold, "OC{0}_OS_InWater.shp".format(hyd_num))  # define the output shp file name
+    inwaterB_gp.to_file(export_path, driver='ESRI Shapefile')
 
 def get_bvi(root, epsg, coords, outfold, hyd_num, grid_list, work_hydAr):
     print("extracting Beaver Veg. Index within Op Catch")
@@ -233,6 +256,7 @@ def get_bvi(root, epsg, coords, outfold, hyd_num, grid_list, work_hydAr):
 
     out_img = None
     mosaic = None
+    src = None
 
 
 def get_dem(dem_root,epsg, coords, outfold, hyd_num, grid_list, work_hydAr):
@@ -282,11 +306,14 @@ def get_dem(dem_root,epsg, coords, outfold, hyd_num, grid_list, work_hydAr):
 
     mosaic = None
     out_img = None
+    src = None
 
     maskedRas = rasterio.open(out_ras)
 
     hydAr_gj = getFeatures(work_hydAr)
     mosaicb, otb = mask(dataset=maskedRas, shapes=hydAr_gj, crop=False, nodata=(-100), all_touched=False)
+
+    maskedRas = None
 
     with rasterio.open(out_ras, "w", **out_meta) as dest:
         dest.write(mosaicb)
@@ -299,7 +326,8 @@ def clip(to_clip, clip_shp):
         crs=clip_shp.crs
     )
 
-    clip_gdf = gpd.sjoin(to_clip, union, op='intersects')
+    clip_gdf = gpd.sjoin(to_clip, union, op='within')
+
     clip_gdf = clip_gdf.drop(columns=['index_right'])
 
     return clip_gdf

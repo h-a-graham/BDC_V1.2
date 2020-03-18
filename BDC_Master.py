@@ -21,14 +21,16 @@ def main():
 
     # operCatch = os.path.abspath("C:/HG_Projects/Hugh_BDC_Files/GB_Beaver_modelling/NRW_Catchments/Welsh_CEH_HA.shp")
     # operCatch = os.path.abspath("C:/HG_Projects/Hugh_BDC_Files/GB_Beaver_modelling/NRW_Catchments/Severn_HA.shp")
-    # operCatch = os.path.abspath("C:/HG_Projects/Hugh_BDC_Files/GB_Beaver_modelling/ENGLAND_Catchm/England_Catchments.shp") # must revisit soon.
+    operCatch = os.path.abspath("C:/HG_Projects/Hugh_BDC_Files/GB_Beaver_modelling/ENGLAND_Catchm/England_CEH_HA.gpkg") # must revisit soon.
+    # operCatch = os.path.abspath("C:/HG_Projects/Hugh_BDC_Files/GB_Beaver_modelling/ENGLAND_Catchm/Servern_CEH_HA.gpkg") # For testing
     # operCatch = os.path.abspath("C:/HG_Projects/Hugh_BDC_Files/Alan_BDC/MC3055_shape/Ma_catch_3055.shp")
     # operCatch = os.path.abspath("C:/HG_Projects/Hugh_BDC_Files/Alan_BDC/MC3060_shape/Ma_catch_3060.shp")
     # operCatch = os.path.abspath('C:/HG_Projects/Hugh_BDC_Files/new_Version_testing/in_shps/r_otter_area_0002.gpkg')
     # operCatch = os.path.abspath('C:/HG_Projects/Hugh_BDC_Files/new_Version_testing/in_shps/CH_area_0001.gpkg')
     # operCatch = os.path.abspath('C:/HG_Projects/Hugh_BDC_Files/Alan_BDC/Alan_Batch_gpkg/Ma_catch_3089.gpkg')
+    # operCatch = os.path.abspath('C:/HG_Projects/Hugh_BDC_Files/Alan_BDC/Alan_Batch_gpkg/Ma_catch_3085.gpkg')
 
-    operCatch = os.path.abspath('C:/HG_Projects/Hugh_BDC_Files/Alan_BDC/Alan_Batch_gpkg/Ma_catchments_All.gpkg')
+    # operCatch = os.path.abspath('C:/HG_Projects/Hugh_BDC_Files/Alan_BDC/Alan_Batch_gpkg/Ma_catchments_All.gpkg')
     # operCatch = os.path.abspath('C:/HG_Projects/Hugh_BDC_Files/Alan_BDC/Alan_Batch_gpkg/Ma_catch_3036.gpkg')
 
     cehHydArea = os.path.abspath("C:/HG_Projects/Hugh_BDC_Files/GB_Beaver_modelling/EA_catchments/"
@@ -36,18 +38,19 @@ def main():
 
     os_gridPath = os.path.abspath("C:/HG_Projects/Hugh_BDC_Files/GB_Beaver_modelling/OS_Grids/OSGB_Grid_100km.shp")
 
-    # outRoot = os.path.abspath("D:/HG_Work/GB_Beaver_Data/ENGLAND_BDC_Out") # Need to try again
+    outRoot = os.path.abspath("D:/HG_Work/GB_Beaver_Data/ENGLAND_BDC_Out") # Need to try again
+    # outRoot = os.path.abspath("D:/HG_Work/GB_Beaver_Data/SevernHA_BDC_Out") # For testing
     # outRoot = os.path.abspath("D:/HG_Work/GB_Beaver_Data/NRW_Severn_Out")
     # outRoot = os.path.abspath("C:/HG_Projects/Hugh_BDC_Files/new_Version_testing/Tamar_Test")
-    # outRoot = os.path.abspath("C:/HG_Projects/Hugh_BDC_Files/new_Version_testing/Exp_folder")
+    # outRoot = os.path.abspath("C:/HG_Projects/Hugh_BDC_Files/new_Version_testing/SW_Lakes_Testing")
 
-    outRoot = os.path.abspath('C:/HG_Projects/Hugh_BDC_Files/Alan_BDC/Batch_Job0220')
+    # outRoot = os.path.abspath('C:/HG_Projects/Hugh_BDC_Files/Alan_BDC/Batch_Job0220_V2')
     # outRoot = os.path.abspath('C:/HG_Projects/Hugh_BDC_Files/Alan_BDC/3036_test')
 
     epsg_code = str(27700)
 
     prep_only = False
-    skip_prep = False
+    skip_prep = True
 
     if skip_prep is False:
         print("running data prep script to organise inputs for all target Dam Capacity Areas/ Catchments")
@@ -72,7 +75,7 @@ def main():
                 ocNum = direc[-4:]
                 print("running BDC pipeline for Operational Catchment {0}".format(ocNum))
                 home = os.path.join(outRoot, direc)
-                raw_lines = os.path.join(home, "OC{0}_MM_rivers.gpkg".format(ocNum))
+                raw_lines = os.path.join(home, "OC{0}_MM_rivers.shp".format(ocNum))
 
                 split_lines = os.path.join(home, "BDC_reaches.gpkg")
 
@@ -84,7 +87,7 @@ def main():
 
 
                 DEM_path = os.path.join(home, "OC{0}_DTM.tif".format(ocNum))  # Below commented out for testing split lines
-                in_waterArea = os.path.join(home, "OC{0}_OS_InWater.gpkg".format(ocNum))
+                in_waterArea = os.path.join(home, "OC{0}_OS_InWater.shp".format(ocNum))
                 BVI_raster = os.path.join(home, "OC{0}_BVI.tif".format(ocNum))
 
                 gdb_name = "scratch_OC{0}".format(ocNum)
@@ -116,7 +119,7 @@ def main():
                 print("running Vegetation Fuzzy Inference System")
                 Veg_FIS.main(bdc_net, scratch_gdb)
 
-                opCatchArea = os.path.join(home, "OC{0}_catchmentArea.gpkg".format(ocNum))
+                opCatchArea = os.path.join(home, "OC{0}_catchmentArea.shp".format(ocNum))
                 print("running Hydrological Fuzzy Inference System")
                 iHyd.main(bdc_net, scratch_gdb, cehHydArea, opCatchArea)
 
