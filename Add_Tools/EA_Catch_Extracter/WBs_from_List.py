@@ -8,6 +8,7 @@ import matplotlib.pyplot as plt
 import sys
 import requests
 from warnings import warn
+from tqdm import tqdm
 pd.set_option('display.max_rows', 500)
 pd.set_option('display.max_columns', 500)
 pd.set_option('display.width', 1000)
@@ -29,7 +30,7 @@ def main(catchment_list, out_file, epsg_code, catch_type):
 
 
     gpd_lis = []
-    for catch in catchment_list:
+    for catch in tqdm(catchment_list):
         poly_url = "https://environment.data.gov.uk/catchment-planning/so/{0}/{1}/polygon".format(catch_type, catch)
         with urllib.request.urlopen(poly_url) as url:
             data = geojson.loads(url.read().decode())
@@ -57,6 +58,10 @@ def main(catchment_list, out_file, epsg_code, catch_type):
                         wb_number = metpand['riverBasinDistrictNotation'][0]
                         wb_name = metpand['label'][0]
 
+                    elif catch_type == 'OperationalCatchment':
+                        wb_number = metpand['notation'][0]
+                        wb_name = metpand['label'][0]
+
                     else:
                         warn('A catchment type has been provided that is not yet supported...')
                         exit()
@@ -74,7 +79,12 @@ def main(catchment_list, out_file, epsg_code, catch_type):
             if catch_type == 'WaterBody':
                 gp_df['WB_area_km2'] = wb_area_km2
             elif catch_type == 'RiverBasinDistrict':
+                gp_df = gp_df.to_crs(crs='epsg:{}'.format(epsg_code))
                 gp_df['WB_area_km2'] = gp_df.area
+            elif catch_type == 'OperationalCatchment':
+                gp_df = gp_df.to_crs(crs='epsg:{}'.format(epsg_code))
+                gp_df['WB_area_km2'] = gp_df.area
+
             else:
                 warn("Catchment type not recognised...")
                 gp_df['WB_area_km2'] = gp_df.area
@@ -106,14 +116,14 @@ def main(catchment_list, out_file, epsg_code, catch_type):
     # print(rdf)
 
     if format == 'GeoJSON':
-        rdf.crs = {'init': 'epsg:4326'}
+        rdf.crs = 'epsg:4326'
         rdf.to_file(out_file, driver="GeoJSON")
     else:
         print('{0} format selected - reproject to epsg: {1}'.format(file_extension, epsg_code))
 
-        rdf.crs = {'init': 'epsg:4326'}
+        # rdf.crs = {'init': 'epsg:4326'}
 
-        rdf = rdf.to_crs({'init': 'epsg:{}'.format(epsg_code)})
+        rdf = rdf.to_crs('epsg:{}'.format(epsg_code))
 
         print('features now in crs: {}'.format(rdf.crs))
 
