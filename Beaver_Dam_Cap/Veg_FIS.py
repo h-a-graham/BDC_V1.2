@@ -16,9 +16,9 @@ import sys
 import geopandas as gpd
 
 
-def main(in_network, scratch):
+def main(in_network):
 
-    net_gpd = gpd.read_file(in_network, driver="ESRI Shapefile")
+    net_gpd = in_network.reset_index(drop=True)
 
     net_gpd.loc[net_gpd['iVeg_40'] < 0, 'iVeg_40'] = 0
     net_gpd.loc[net_gpd['iVeg_10'] < 0, 'iVeg_10'] = 0
@@ -92,33 +92,6 @@ def main(in_network, scratch):
 
     net_gpd['oVC_EX'] = out
 
-    net_gpd.to_file(in_network, driver="ESRI Shapefile")
-    # # save the output text file then merge to shapefile
-    # reach_no = np.arange(1, len(out) + 1, 1)
-    # columns = np.column_stack((reach_no, out))
-    # out_table = os.path.dirname(in_network) + '/oVC_EX_Table.txt'
-    # np.savetxt(out_table, columns, delimiter=',', header='reach_no, oVC_EX', comments='')
-    #
-    # bvi_fields = [f.name for f in arcpy.ListFields(in_network)]
-    # if "oVC_EX" in bvi_fields:
-    #     print("field oVC_EX already exists - deleting")
-    #     arcpy.DeleteField_management(in_network, 'oVC_EX')
-    #
-    # ovc_table = scratch + '/ovc_ex_table'
-    # arcpy.CopyRows_management(out_table, ovc_table)
-    # arcpy.JoinField_management(in_network, 'reach_no', ovc_table, 'reach_no', 'oVC_EX')
-    #
-    # if arcpy.Exists(out_table):
-    #     arcpy.Delete_management(out_table)
-    # if arcpy.Exists(ovc_table):
-    #     arcpy.Delete_management(ovc_table)
-    #
-    # del out, reach_no, columns
+    # net_gpd.to_file(in_network, driver="GPKG")
 
-
-    return in_network
-
-if __name__ == '__main__':
-    main(
-        sys.argv[1],
-        sys.argv[2])
+    return net_gpd

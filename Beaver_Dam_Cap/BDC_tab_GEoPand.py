@@ -23,18 +23,15 @@ from functools import partial
 from datetime import datetime
 import numpy as np
 import os
-# import sys
 from rasterstats import zonal_stats, point_query
 import geopandas as gpd
-import matplotlib.pyplot as plt
+# import matplotlib.pyplot as plt
 import pandas as pd
 import shutil
-# import math
-from shapely.geometry import Point, Polygon, MultiPolygon, LinearRing
-from shapely.ops import cascaded_union
+from shapely.geometry import Point
+from shapely.wkb import loads
 from shapely.geometry.multipolygon import MultiPolygon
-from shapely import wkt
-from matplotlib import pyplot as plt
+
 
 ############# START TIME ##############
 startTime = datetime.now()
@@ -50,24 +47,44 @@ def main(path, seg_network_b, sb_DEM, in_water_vec, coded_vegIn, DrAreaPathIn):
         shutil.rmtree(home)
     os.mkdir(home)
 
-    reaches_gdf, proj_crs, process_name, outName, out_network, scratchy = PrepStrNet(seg_network_b, home, home_name)
+    reaches_gdf, proj_crs, process_name, outName, out_network = PrepStrNet(seg_network_b, home, home_name)
 
     iw_area_merge = CreatInWatArea(reaches_gdf, in_water_vec, proj_crs)
 
-    final_gdf = paralellProcess(reaches_gdf, iw_area_merge, sb_DEM, DrAreaPathIn, coded_vegIn, proj_crs )
+    bdc_gdf = paralellProcess(reaches_gdf, iw_area_merge, sb_DEM, DrAreaPathIn, coded_vegIn, proj_crs )
 
-    final_gdf.to_file(out_network, driver="ESRI Shapefile")
+    final_gdf = remove_dup_geoms(bdc_gdf)
 
-    if os.path.isdir(scratchy):
-        print("scratch folder exists")
-        try:
-            shutil.rmtree(scratchy)
-        except Exception as e:
-            print(e)
+    # final_gdf.to_file(out_network, driver="GPKG")
+
+    # if os.path.isdir(scratchy):
+    #     print("scratch folder exists")
+    #     try:
+    #         shutil.rmtree(scratchy)
+    #     except Exception as e:
+    #         print(e)
 
     finTime = datetime.now() - startTime
     print("BDC table script completed. \n"
           "Processing time = {0}".format(finTime))
+
+    return final_gdf, out_network
+
+
+def remove_dup_geoms(gdf):
+    """function to remove any duplicates - prioritises duplicates with high stream orders"""
+    gdf = gdf.sort_values(by=['Str_order'])
+    gdf = gdf.reset_index(drop=True)
+
+    gdf["geometry_wkb"] = gdf["geometry"].apply(lambda geom: geom.wkb)
+    gdf = gdf.drop_duplicates(["geometry_wkb"], keep='last')
+    gdf = gdf.drop(['geometry_wkb'], axis=1)
+    # gdf["geometry_wkb"] = gdf["geometry"].apply(lambda geom: loads(geom))
+
+    gdf = gdf.sort_values(by=['reach_no'])
+    gdf = gdf.reset_index(drop=True)
+
+    return gdf
 
 
 def PrepStrNet(seg_net_pathA, home, h_name):
@@ -76,21 +93,16 @@ def PrepStrNet(seg_net_pathA, home, h_name):
     outNamep = ("process_fold_{0}".format(h_name))
 
     #### create working gdb
-    fgb_name = ("process_fold_{0}_scratch".format(h_name))
-    scratch = os.path.join(home, fgb_name)
-    if os.path.isdir(scratch):
-        shutil.rmtree(scratch)
-    os.mkdir(scratch)
+    # fgb_name = ("process_fold_{0}_scratch".format(h_name))
+    # scratch = os.path.join(home, fgb_name)
+    # if os.path.isdir(scratch):
+    #     shutil.rmtree(scratch)
+    # os.mkdir(scratch)
 
-    # print('making copy of input network')
-    # seg_net_path = os.path.join(scratch, "workingNet.shp")
-    # arcpy.CopyFeatures_management(seg_net_pathA, seg_net_path)
-    # print('Deleting Features with identical geometries')
-    # arcpy.DeleteIdentical_management(seg_net_path, ['Shape'])
     # ##################################################
     print("set up out network path")
 
-    out_networkp = os.path.join(home, "Output_{0}.shp".format(h_name))
+    out_networkp = os.path.join(home, "Output_{0}.gpkg".format(h_name))
 
     print("let's get started")
 
@@ -100,7 +112,7 @@ def PrepStrNet(seg_net_pathA, home, h_name):
     # create sequential numbers for reaches
     seg_network['reach_no'] = np.arange(len(seg_network))
 
-    return seg_network, project_crs, process_namep, outNamep, out_networkp, scratch
+    return seg_network, project_crs, process_namep, outNamep, out_networkp
 
 def CreatInWatArea(seg_network, in_water_vec_a, proj_crs):
     print("create limited inland water area with rivers")
@@ -109,7 +121,7 @@ def CreatInWatArea(seg_network, in_water_vec_a, proj_crs):
     ndb['geometry'] = seg_network.buffer(distance=0.5)
     ndb.crs = proj_crs
 
-    iwv_gdf = gpd.read_file(in_water_vec_a, driver="ESRI Shapefile")
+    iwv_gdf = gpd.read_file(in_water_vec_a)
     iwv_gdf = iwv_gdf[['geometry']]
     iwv_gdf.crs = proj_crs
 
@@ -205,7 +217,7 @@ def MainProcessing(iw_area_merge, DEM_orig, DrArea, coded_vega, proj_crs, full_n
     buf_10m['geometry'] = reach_areasb.buffer(distance=10)
     buf_10m['reach_no'] = reach_areasb['reach_no']
     buf_10m.crs = proj_crs
-    print("DEBUG POINT1")
+
     buf_10m = EraseAreasbyWater(mainShape=buf_10m, ClipShape=clipgeoms, crs=proj_crs, process_name=proc_name)
 
     print ("create foraging buffer")
@@ -215,7 +227,7 @@ def MainProcessing(iw_area_merge, DEM_orig, DrArea, coded_vega, proj_crs, full_n
     buf_40m.crs = proj_crs
     buf_40m = EraseAreasbyWater(mainShape=buf_40m, ClipShape=clipgeoms, crs=proj_crs, process_name=proc_name)
 
-    print("getting start elevation values")
+    # print("getting start elevation values")
 
     stats = LoopRasStats(shape=startpoint_buf, Raster=DEM_orig, stat='min', cat=False, process_name=proc_name)
     seg_network.loc[seg_network['reach_no'] == stats['reach_no'], "iGeo_ElMax"] = stats['min']
@@ -224,7 +236,7 @@ def MainProcessing(iw_area_merge, DEM_orig, DrArea, coded_vega, proj_crs, full_n
     print ("start elevations done for " + proc_name)
 
     # get end elevation values
-    print("getting end elevation values")
+    # print("getting end elevation values")
 
 
     ##### new end elevation value zs
@@ -252,10 +264,7 @@ def MainProcessing(iw_area_merge, DEM_orig, DrArea, coded_vega, proj_crs, full_n
     seg_network["iGeo_Area"] = reach_areasc['geometry'].area.values
     seg_network["iGeo_Width"] = seg_network["iGeo_Area"]/(seg_network["iGeo_Len"] + 40)
 
-    print("zonal statistics for drainage area")
-
     ##### new end Drain Area value zs
-    print("Get reach Drainage Area values")
 
     stats = LoopRasStats(shape=midpoint_buffer, Raster=DrArea, stat='max', cat=False, process_name=proc_name)
     seg_network.loc[seg_network['reach_no'] == stats['reach_no'], "iGeo_DA"] = stats['max']
@@ -265,8 +274,6 @@ def MainProcessing(iw_area_merge, DEM_orig, DrArea, coded_vega, proj_crs, full_n
     seg_network.loc[seg_network["iGeo_DA"] <= 0, "iGeo_DA"] = 0.1
 
     print("drainage areas done for " + proc_name)
-
-    print('Getting foraging vegetation area values')
 
     stats = LoopRasStats(shape=buf_40m, Raster=coded_vega, stat=None, cat=True, process_name=proc_name)
 
@@ -278,7 +285,6 @@ def MainProcessing(iw_area_merge, DEM_orig, DrArea, coded_vega, proj_crs, full_n
 
     print ("foraging veg done for " + proc_name)
 
-    print('Getting riparian vegetation area values')
     stats = LoopRasStats(shape=buf_10m, Raster=coded_vega, stat=None, cat=True, process_name=proc_name)
 
     thm_pd = GetTopHalfMean(stats, process_name=proc_name)
@@ -297,7 +303,7 @@ def MainProcessing(iw_area_merge, DEM_orig, DrArea, coded_vega, proj_crs, full_n
     for i in remove_list:
         if i in cols_list:
             seg_network = seg_network.drop(i, axis=1)
-    print(list(seg_network))
+    # print(list(seg_network))
 
     print(proc_name + " done")
     # print(seg_network.head())
@@ -306,29 +312,38 @@ def MainProcessing(iw_area_merge, DEM_orig, DrArea, coded_vega, proj_crs, full_n
 
 
 def CreateOverlayGeoms(strNet_gdf, inWatArea_gdf, crs, process_name):
-
+    # print('POINT_A: {0}'.format(process_name))
     boundsgeom = gpd.GeoDataFrame()
     boundsgeom['geometry'] = strNet_gdf.buffer(distance=100)
     boundsgeom['reach_no'] = strNet_gdf['reach_no']
     spatial_index = inWatArea_gdf.sindex
-
+    # print('POINT_B: {0}'.format(process_name))
     gdfList = []
     shpLen = len(boundsgeom)
-    counter = 0
+    # counter = 0
     for i, shp in boundsgeom.iterrows():
-        counter += 1
+        # counter += 1
+        # print('p1')
         gdf = gpd.GeoDataFrame(gpd.GeoSeries(shp['geometry']), columns=['geometry'])
-
+        # print('p2')
         bound_matches_index = list(spatial_index.intersection(gdf.bounds.iloc[0]))
+        # print('p3')
         matches = inWatArea_gdf.loc[bound_matches_index]
+        # print('p4')
         out_gdf = gpd.GeoDataFrame()
-        out_gdf['geometry'] = gpd.GeoSeries(cascaded_union(matches['geometry']))
+        # print('p5')
+        matches['merge'] = 'merge'
+        matches_diss = matches.dissolve(by='merge')
+        out_gdf['geometry'] = gpd.GeoSeries(matches_diss['geometry'])
+        # print('p6')
         # out_gdf['reach_no'] = shp['reach_no']
         gdfList.append(out_gdf)
+    # print('POINT_C: {0}'.format(process_name))
 
     clipping_gdf = gpd.GeoDataFrame(pd.concat(gdfList, ignore_index=True))
     clipping_gdf.crs = crs
     clipping_gdf['merge'] = 'merge'
+    # print('POINT_D: {0}'.format(process_name))
     m_poly = clipping_gdf.dissolve(by='merge')
     m_poly = m_poly.reset_index()
     m_poly = m_poly.drop(columns='merge')
@@ -377,7 +392,7 @@ def LoopRasStats(shape, Raster, stat, cat, process_name):
         gs = gpd.GeoSeries(shp['geometry'])
         try:
             stats = zonal_stats(gs, Raster, all_touched=True,
-                            stats=stat, categorical=cat)
+                            stats=stat, categorical=cat, nodata=-999)
         except Exception as e:
             print(e)
             print(shp)
@@ -412,8 +427,7 @@ def GetTopHalfMean(stat_df, process_name):
     counter = 0
     for i, row in stat_df.iterrows():
         counter += 1
-        # print(i)
-        # print('\r{0}/{1} completed'.format(i, nr))
+
         rnum = int(row['reach_no'])
         mod_arr = pd.DataFrame(row)
         mod_arr.columns = ['ncells']
@@ -432,13 +446,9 @@ def GetTopHalfMean(stat_df, process_name):
 
         stat_list.append(out_df)
 
-        # print_progress(counter, nr, prefix='TopHalfMean - {0}:'.format(process_name), suffix='Complete')
-
     dframe = pd.concat(stat_list, sort=False)
-    # dframe = dframe.reset_index(drop=True)
     dframe = dframe.set_index('reach_no', drop=False)
     dframe.index.name = None
-    # print(dframe)
     print('TopHalfMean -{0}: Completed'.format(process_name))
     return dframe
 
@@ -451,7 +461,7 @@ def ClipAreasbyWater(mainShape, ClipShape, crs, process_name):
 
     for i, row in mainShape.iterrows():
         count += 1
-        # print(count)
+
         reachNum = row.loc['reach_no']
         main_so = row.loc['geometry']
 
@@ -487,7 +497,7 @@ def ClipAreasbyWater(mainShape, ClipShape, crs, process_name):
     out_shape = gpd.GeoDataFrame(geometry=gpd.GeoSeries(geom_list))
     out_shape['reach_no'] = rn_list
     out_shape.crs = crs
-    print(out_shape)
+    # print(out_shape)
     return out_shape
 
 
@@ -497,8 +507,7 @@ def EraseAreasbyWater(mainShape, ClipShape, crs, process_name):
     count = 0
     for i, row in mainShape.iterrows():
         count += 1
-        reachNum = (row['reach_no'])
-        main_so = (row['geometry'])
+
         reachNum = row.loc['reach_no']
         main_so = row.loc['geometry']
         # workArea = ClipShape.loc[ClipShape['reach_no'] == reachNum]
@@ -526,13 +535,13 @@ def EraseAreasbyWater(mainShape, ClipShape, crs, process_name):
     out_shape = gpd.GeoDataFrame(geometry=gpd.GeoSeries(geom_list))
     out_shape['reach_no'] = rn_list
     out_shape.crs = crs
-    print(out_shape)
+    # print(out_shape)
     return out_shape
 
 
 def paralellProcess(net_gdf, iw_area_shp, sb_DEM, DrAreaPathIn, coded_vegIn, proj_crs ):
     # gdf = MainProcessing(iw_area_shp, sb_DEM, DrAreaPathIn, coded_vegIn, proj_crs, net_gdf.copy(), net_gdf)
-    # print("END-BREAK")
+
     n_feat = len(net_gdf)
     rowlim  = 1000
     num_cores = multiprocessing.cpu_count()
@@ -548,13 +557,17 @@ def paralellProcess(net_gdf, iw_area_shp, sb_DEM, DrAreaPathIn, coded_vegIn, pro
 
     function = partial(MainProcessing, iw_area_shp, sb_DEM, DrAreaPathIn, coded_vegIn, proj_crs, net_gdf.copy())
     results = pool.map(function, df_split)
-
-    gdf = pd.concat(results)
-
     pool.close()
     pool.join()
-    gdf.plot(column='Str_order')
-    plt.show()
+    print('pools closed/joined...')
+
+    print('joining outputs...')
+    gdf = pd.concat(results)
+    gdf = gdf.reset_index(drop=True)
+    gdf['reach_no'] = gdf.index
+
+    # gdf.plot(column='Str_order')
+    # plt.show()
 
     return gdf
 

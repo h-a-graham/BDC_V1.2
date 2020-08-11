@@ -2,16 +2,16 @@
 import os
 import geopandas as gpd
 from shapely.geometry import Point, LineString
-import sys
+
 
 def main(home, rivers, epsg):
     rivers_gpd = gpd.read_file(rivers)
 
     split_gdf = split_recurs(rivers_gpd)
 
-    split_gdf.crs = ({'init': 'epsg:' + epsg})
+    split_gdf.crs = ('epsg:{}'.format(epsg))
 
-    split_gdf.to_file(os.path.join(home, "BDC_reaches.gpkg"))
+    split_gdf.to_file(os.path.join(home, "BDC_reaches.gpkg"), driver='GPKG')
 
 
 def split_recurs(line_gdf):
@@ -68,7 +68,3 @@ def itersplit(l_list):
         itersplit(l_list)
 
     return l_list
-
-
-if __name__ == '__main__':
-    main(sys.argv[1], sys.argv[2], sys.argv[3])
