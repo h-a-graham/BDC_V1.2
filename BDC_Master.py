@@ -29,10 +29,19 @@ def main():
     os_gridPath = os.path.abspath("C:/HG_Projects/Hugh_BDC_Files/GB_Beaver_modelling/OS_Grids/OSGB_Grid_100km.shp")
 
     # ---------------- Edit:
-    operCatch = os.path.abspath("C:/HG_Projects/Hugh_BDC_Files/GB_Beaver_modelling/"
-                                "CEH_catchments/GB_CEH_HAs_V2.gpkg")
+    # operCatch = os.path.abspath("C:/HG_Projects/Hugh_BDC_Files/GB_Beaver_modelling/"
+    #                             "CEH_catchments/GB_CEH_HAs_V2.gpkg")
+    # outRoot = os.path.abspath("D:/HG_Work/GB_Beaver_Data/BeaverNetwork_GB")
 
-    outRoot = os.path.abspath("D:/HG_Work/GB_Beaver_Data/BeaverNetwork_GB")
+    # OutGpkgName = 'BeaverNetwork_GB'
+
+    operCatch = os.path.abspath("C:/HG_Projects/Hugh_BDC_Files/GB_Beaver_modelling/"
+                                "CEH_catchments/TestCase3.gpkg")
+
+    outRoot = os.path.abspath("D:/HG_Work/GB_Beaver_Data/Test_CASE")
+
+    OutGpkgName = 'BeaverNetwork_Test3'
+
 
     epsg_code = str(27700)
 
@@ -118,7 +127,7 @@ def main():
 
         print('join files to multi-layer gpkg')
 
-        join_gpkg_layers(root=outRoot, gpkg_name='BeaverNetwork_GB', prefix='BeaverNetwork_CEH_HA')
+        join_gpkg_layers(root=outRoot, gpkg_name=OutGpkgName, prefix='BeaverNetwork_CEH_HA')
 
 
     finTime = datetime.now() - startTime

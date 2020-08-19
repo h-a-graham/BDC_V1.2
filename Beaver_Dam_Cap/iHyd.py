@@ -17,13 +17,15 @@ import geopandas as gpd
 
 def main(DA, cehpath, opcpath):
 
+
+
     print('Adding Qlow and Q2 to network')
 
 
-    command = os.path.abspath("C:/Program Files/R/R-3.6.1/bin/Rscript.exe")
+    command = os.path.abspath("C:/Program Files/R/R-3.6.3/bin/Rscript.exe")
     scriptHome = os.path.dirname(__file__)
     print(scriptHome)
-    myscript_loc = os.path.join(scriptHome, "Extacting_data_from_CEH.R")
+    myscript_loc = os.path.join(scriptHome, "Extracting_data_from_CEH_V2.R")
 
     # args = [46, 2, 3, 4, 66]
     # args = [str(region)]
@@ -57,6 +59,8 @@ def main(DA, cehpath, opcpath):
 
 
 def get_ceh_areas(ceh_path, opc_path):
+    rating_img_root = os.path.dirname(opc_path)
+
     print("retrieving CEH Hydrometric Area Values")
 
     ceh_gp = gpd.read_file(ceh_path)
@@ -69,10 +73,10 @@ def get_ceh_areas(ceh_path, opc_path):
 
     ceh_areas['area'] = ceh_areas['geometry'].area / 10**6
 
-    if len(ceh_areas)>1:
+    if len(ceh_areas) > 1:
         topArea = ceh_areas.loc[ceh_areas.area.idxmax()]
-        grid_list = [str(topArea[0])]
+        grid_list = [str(topArea[0]), rating_img_root]
     else:
-        grid_list = list(map(str, (ceh_areas['HA_NUM'])))
+        grid_list = list(map(str, (ceh_areas['HA_NUM']))) + [rating_img_root]
 
     return grid_list
