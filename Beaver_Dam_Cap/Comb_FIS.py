@@ -10,17 +10,14 @@
 import skfuzzy as fuzz
 from skfuzzy import control as ctrl
 import numpy as np
-import os
+# import os
 import sys
 import geopandas as gpd
 
 
-def main(in_network, scratch):
+def main(net_gpd):
     max_DA_thresh = 75
     max_Width_thresh = 20
-
-
-    net_gpd = gpd.read_file(in_network, driver="ESRI Shapefile")
 
     net_gpd.loc[net_gpd['oVC_EX'] < 0, 'oVC_EX'] = 0
     net_gpd.loc[net_gpd['oVC_EX'] > 45, 'oVC_EX'] = 44
@@ -165,22 +162,18 @@ def main(in_network, scratch):
     net_gpd.loc[net_gpd['Str_order'] >= 6, 'BDC'] = 0
     net_gpd.loc[net_gpd['BDC'] > net_gpd['oVC_EX'], 'BDC'] = net_gpd['oVC_EX']
 
-    net_gpd.to_file(in_network)
+    # net_gpd.to_file(in_network, driver='GPKG')
 
-    import pandas as pd
-    pd.set_option('display.max_rows', 500)
-    pd.set_option('display.max_columns', 500)
-    pd.set_option('display.width', 1000)
+    return net_gpd
 
-    print(net_gpd.tail())
-    print('top')
+    # import pandas as pd
+    # pd.set_option('display.max_rows', 500)
+    # pd.set_option('display.max_columns', 500)
+    # pd.set_option('display.width', 1000)
+    #
+    # print(net_gpd.tail())
+    # print('top')
 
-    from matplotlib import pyplot as plt
-    net_gpd.plot(column='BDC')
-    plt.show()
-
-
-if __name__ == '__main__':
-    main(
-        sys.argv[1],
-        sys.argv[2])
+    # from matplotlib import pyplot as plt
+    # net_gpd.plot(column='BDC')
+    # plt.show()

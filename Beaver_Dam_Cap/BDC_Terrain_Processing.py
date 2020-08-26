@@ -1,15 +1,15 @@
 
 from datetime import datetime
 import os
-import sys
+# import sys
 import rasterio
 import geopandas as gpd
 from rasterio import features
 import subprocess
-import numpy as np
+# import numpy as np
 import shutil
-from matplotlib import pyplot as plt
-import pandas as pd
+# from matplotlib import pyplot as plt
+# import pandas as pd
 
 ############# START TIME ##############
 startTime = datetime.now()
@@ -20,8 +20,8 @@ def main(path, scratch_gdb, seg_network_a, DEM_orig, epsg):
     print(startTime)
 
     home_name = "BDC_OC{0}".format(path[-4:])  # REQUIRED - name of home working directory to be created
-    home = os.path.join(path, home_name)  # Don't Edit
-    outname = "Output_BDC_OC{0}.shp".format(path[-4:])  # REQUIRED - output file name -  must end in .shp
+    # home = os.path.join(path, home_name)  # Don't Edit
+    # outname = "Output_BDC_OC{0}.gpkg".format(path[-4:])  # REQUIRED - output file name
 
 
     print("Run Stream Burn Process")
@@ -43,8 +43,8 @@ def main(path, scratch_gdb, seg_network_a, DEM_orig, epsg):
 
     else:
         seg_net_gdf =join_str_order(riv_gdf, strord_lines)
-        seg_net_gdf.crs = ({'init': 'epsg:' + epsg})
-        seg_net_gdf.to_file(reaches_out)
+        seg_net_gdf.crs = ('epsg:{}'.format(epsg))
+        seg_net_gdf.to_file(reaches_out, driver='GPKG')
 
     if os.path.isdir(grass_dir):
         try:
@@ -83,8 +83,8 @@ def streamBurning(DEM_orig, scratch_gdb, seg_network_a, home, home_name):
 
         features.rasterize(shapes=shapes, fill=0, out=out_arr, transform=out.transform,
                                     all_touched=True)
-        print(np.max(out_arr))
-        print(np.min(out_arr))
+        # print(np.max(out_arr))
+        # print(np.min(out_arr))
 
         out.write_band(1, out_arr)
 
@@ -155,8 +155,7 @@ def join_str_order(streams_gdf, str_ord_lines):
 
     riv_centroids['geometry'] = [x.interpolate(x.length / 2) for x in riv_centroids['geometry']]
 
-
-    riv_centroids['geometry'] = riv_centroids['geometry'].buffer(10)
+    riv_centroids['geometry'] = riv_centroids['geometry'].buffer(6)
 
     streams_so_join = gpd.sjoin(riv_centroids, so_gdf, how='left', op='intersects', lsuffix='left',
                              rsuffix='right')
@@ -164,22 +163,11 @@ def join_str_order(streams_gdf, str_ord_lines):
     streams_gdf['join_key'] = streams_gdf.index
     streams_so_join = streams_gdf.merge(streams_so_join, on='join_key', how='left')
 
-    streams_so_join = gpd.GeoDataFrame(streams_so_join[['reach_leng_x', 'strahler']],
+    streams_so_join = gpd.GeoDataFrame(streams_so_join[['reach_length_x', 'strahler']],
                                        geometry=gpd.GeoSeries(streams_so_join['geometry_x']))
 
     streams_so_join = streams_so_join.rename(columns={"strahler": "Str_order"})
-    streams_so_join = streams_so_join.rename(columns={"reach_leng_x": "reach_leng"})
+    streams_so_join = streams_so_join.rename(columns={"reach_length_x": "reach_leng"})
     streams_so_join["Str_order"] = streams_so_join["Str_order"].fillna(value=1)
 
     return streams_so_join
-
-
-if __name__ == '__main__':
-        main(
-        sys.argv[1],
-        sys.argv[2],
-        sys.argv[3],
-        sys.argv[4],
-        sys.argv[5])
-
-

@@ -7,16 +7,17 @@ import rasterio
 from rasterio.merge import merge
 from rasterio.mask import mask
 from rasterio.crs import CRS
-from shapely.geometry import box, LineString
-import shutil
+from shapely.geometry import box
 from datetime import datetime
-
-from matplotlib import pyplot as plt
-startTime = datetime.now()
+# from matplotlib import pyplot as plt
 
 
-def BDC_setup_main(rivers_root, dem_path, bvi_etc_root, operCatch, os_gridPath, epsg_code, outRoot):
+def BDC_setup_main(rivers_root, dem_path, bvi_etc_root, operCatch, epsg_code, outRoot, **kwargs):
+    id_col = kwargs.get('id_column', None)
 
+    os_gridPath = os.path.join(os.path.dirname(__file__), 'Data', 'OSGB_Grid_100km.gpkg')
+
+    startTime = datetime.now()
     print("running BDC setup script")
     print("start time = {0}".format(startTime))
 
@@ -27,16 +28,20 @@ def BDC_setup_main(rivers_root, dem_path, bvi_etc_root, operCatch, os_gridPath, 
         os.makedirs(outRoot)
 
     opCatch_gp = gpd.read_file(operCatch)
-    opCatch_gp.to_crs = ({'init': 'epsg:' + epsg_code})
+    opCatch_gp = opCatch_gp.to_crs(crs='epsg:{}'.format(epsg_code))
     print(opCatch_gp.crs)
 
 
     # A better way of handling indexes would be nice but for now you must add manually.
-    if 'id' in opCatch_gp.columns:
+    if id_col is None:
+        print("id column not provided - adding default id numbers")
+        opCatch_gp['id'] = opCatch_gp.index + 1000
         print("id column exists - continue")
     else:
-        print("id column does not exists - add one")
-        opCatch_gp['id'] = opCatch_gp.index + 1000
+        try:
+            opCatch_gp['id'] = opCatch_gp[id_col] + 1000
+        except KeyError as e:
+            raise Exception('Supplied ID column does not exist in geo data frame: {0}'.format(id_col))
 
 
     id_listA = list(opCatch_gp['id'])
@@ -60,14 +65,14 @@ def BDC_setup_main(rivers_root, dem_path, bvi_etc_root, operCatch, os_gridPath, 
 
 
         opCatSelec = opCatch_gp[opCatch_gp.id == area]
-        opCatSelec.crs = ({'init': 'epsg:' + epsg_code})
+        opCatSelec.crs = ('epsg:{}'.format(epsg_code))
         exp_path = os.path.join(outFolder,
-                                   "OC{0}_catchmentArea.shp".format(area))  # define the output shp file name
-        opCatSelec.to_file(exp_path, driver='ESRI Shapefile')
+                                   "OC{0}_catchmentArea.gpkg".format(area))  # define the output shp file name
+        opCatSelec.to_file(exp_path, driver='GPKG')
 
         coords, grid_List = get_extents(opCatSelec, os_gridPath, epsg_code)
 
-        get_rivs_arc(rivers_root, opCatSelec, grid_List, outFolder, area, epsg_code)
+        get_rivs(rivers_root, opCatSelec, grid_List, outFolder, area, epsg_code)
         get_inWatArea(bvi_etc_root, opCatSelec, epsg_code, grid_List, outFolder, area)
         get_bvi(bvi_etc_root, epsg_code, coords, outFolder, area, grid_List, opCatSelec)
         get_dem(dem_path, epsg_code, coords, outFolder, area, grid_List, opCatSelec)
@@ -84,7 +89,7 @@ def BDC_setup_main(rivers_root, dem_path, bvi_etc_root, operCatch, os_gridPath, 
 def get_extents(work_hyd_area, os_grid, epsg):
     print("getting working extents for Op Catch hydrometic area")
 
-    ordsurv_gp = gpd.read_file(os_grid, driver="ESRI Shapefile")
+    ordsurv_gp = gpd.read_file(os_grid)
     ordsurv_gp['GRIDSQ'] = ordsurv_gp['TILE_NAME']
     os_grids = gpd.overlay(ordsurv_gp, work_hyd_area, how='intersection')
     print(os_grids)
@@ -97,7 +102,7 @@ def get_extents(work_hyd_area, os_grid, epsg):
     geo = gpd.GeoDataFrame({'geometry': bbox}, index=[0])
     coords = getFeatures(geo)
 
-    geo.crs = ({'init': 'epsg:' + epsg})
+    geo.crs = ('epsg:{}'.format(epsg))
     return coords, grid_list
 
 
@@ -106,7 +111,7 @@ def getFeatures(gdf):
     return [json.loads(gdf.to_json())['features'][0]['geometry']]
 
 
-def get_rivs_arc(riv_root, oc_shp, grid_list, outfold, hyd_num, epsg):
+def get_rivs(riv_root, oc_shp, grid_list, outfold, hyd_num, epsg):
     print("extracting detailed river network features with Op Catch")
 
     oc_area = oc_shp.loc[oc_shp.id == hyd_num].copy()
@@ -134,16 +139,7 @@ def get_rivs_arc(riv_root, oc_shp, grid_list, outfold, hyd_num, epsg):
 
                 rivs_clipped = clip(riv_gpd, oc_area)
 
-                # temp_file = os.path.join(scratch, 'tempfile{0}.shp'.format(count))
-                # rivs_clipped.to_file(temp_file)
-
                 river_list.append(rivs_clipped)
-                # rivs_clipped = None
-
-
-
-    # export_path = os.path.join(outfold, "OC{0}_MM_rivers.shp".format(hyd_num))
-
 
 
     if len(river_list) > 1:
@@ -160,14 +156,14 @@ def get_rivs_arc(riv_root, oc_shp, grid_list, outfold, hyd_num, epsg):
 
         riv_masked = river_list[0]
 
-    riv_masked.crs = ({'init': 'epsg:' + epsg})
+    riv_masked.crs = ('epsg:{}'.format(epsg))
 
     rivs_clipped = None
     river_list = None
 
-    export_path = os.path.join(outfold, "OC{0}_MM_rivers.shp".format(hyd_num))
+    export_path = os.path.join(outfold, "OC{0}_MM_rivers.gpkg".format(hyd_num))
 
-    riv_masked.to_file(export_path, driver='ESRI Shapefile')
+    riv_masked.to_file(export_path, driver='GPKG')
 
     # pd.set_option('display.max_rows', 500)
     # pd.set_option('display.max_columns', 500)
@@ -199,14 +195,14 @@ def get_inWatArea(root, oc_ha, epsg, grid_list, outfold, hyd_num):
 
     water_list = None
 
-    inwaterA_gp.crs = ({'init': 'epsg:' + epsg})
+    inwaterA_gp.crs = ('epsg:{}'.format(epsg))
 
     inwaterB_gp = gpd.overlay(inwaterA_gp, oc_ha, how='intersection')
 
     inwaterA_gp = None
 
-    export_path = os.path.join(outfold, "OC{0}_OS_InWater.shp".format(hyd_num))  # define the output shp file name
-    inwaterB_gp.to_file(export_path, driver='ESRI Shapefile')
+    export_path = os.path.join(outfold, "OC{0}_OS_InWater.gpkg".format(hyd_num))  # define the output shp file name
+    inwaterB_gp.to_file(export_path, driver='GPKG')
 
 def get_bvi(root, epsg, coords, outfold, hyd_num, grid_list, work_hydAr):
     print("extracting Beaver Veg. Index within Op Catch")
@@ -326,19 +322,8 @@ def clip(to_clip, clip_shp):
         crs=clip_shp.crs
     )
 
-    clip_gdf = gpd.sjoin(to_clip, union, op='within')
+    clip_gdf = gpd.sjoin(to_clip, union, op='intersects')  # previously 'within': caused deletion of tidal reaches
 
     clip_gdf = clip_gdf.drop(columns=['index_right'])
 
     return clip_gdf
-    # return gpd.overlay(to_clip, union, how='intersection')
-
-
-if __name__ == '__main__':
-     BDC_setup_main(sys.argv[1],
-                    sys.argv[2],
-                    sys.argv[3],
-                    sys.argv[4],
-                    sys.argv[5],
-                    sys.argv[6],
-                    sys.argv[7])
