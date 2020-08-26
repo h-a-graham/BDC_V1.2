@@ -23,25 +23,19 @@ def main():
 
     bvi_etc_root = os.path.abspath("D:/HG_Work/GB_Beaver_Data/GB_BVI_Res_v2")
 
-    cehHydArea = os.path.abspath("C:/HG_Projects/Hugh_BDC_Files/GB_Beaver_modelling/EA_catchments/"
-                                 "FME_656D6600_1568991385841_5210/temp/hyd_areas.shp")
-
-    os_gridPath = os.path.abspath("C:/HG_Projects/Hugh_BDC_Files/GB_Beaver_modelling/OS_Grids/OSGB_Grid_100km.shp")
-
     # ---------------- Edit:
     # operCatch = os.path.abspath("C:/HG_Projects/Hugh_BDC_Files/GB_Beaver_modelling/"
     #                             "CEH_catchments/GB_CEH_HAs_V2.gpkg")
     # outRoot = os.path.abspath("D:/HG_Work/GB_Beaver_Data/BeaverNetwork_GB")
-
+    #
     # OutGpkgName = 'BeaverNetwork_GB'
 
     operCatch = os.path.abspath("C:/HG_Projects/Hugh_BDC_Files/GB_Beaver_modelling/"
-                                "CEH_catchments/TestCase3.gpkg")
+                                "CEH_catchments/TEST_ExeGroup.gpkg")
 
     outRoot = os.path.abspath("D:/HG_Work/GB_Beaver_Data/Test_CASE")
 
-    OutGpkgName = 'BeaverNetwork_Test3'
-
+    OutGpkgName = 'BeaverNetwork_ExeGroup'
 
     epsg_code = str(27700)
 
@@ -51,7 +45,7 @@ def main():
     # ------------------- program begins:
     if skip_prep is False:
         print("running data prep script to organise inputs for all target Dam Capacity Areas/ Catchments")
-        Dataset_Prep.BDC_setup_main(rivers_root, dem_path, bvi_etc_root, operCatch, os_gridPath, epsg_code, outRoot,
+        Dataset_Prep.BDC_setup_main(rivers_root, dem_path, bvi_etc_root, operCatch, epsg_code, outRoot,
                                     id_column='HA_NUM')
     else:
         print("skipping preperation script due to skip_prep setting...")
@@ -116,7 +110,7 @@ def main():
 
                 opCatchArea = os.path.join(home, "OC{0}_catchmentArea.gpkg".format(ocNum))
                 print("running Hydrological Fuzzy Inference System")
-                bdc_gdf = iHyd.main(bdc_gdf, cehHydArea, opCatchArea)
+                bdc_gdf = iHyd.main(bdc_gdf, opCatchArea)
 
                 print("running Combined Fuzzy Inference System")
                 Comb_FIS.main(bdc_gdf)

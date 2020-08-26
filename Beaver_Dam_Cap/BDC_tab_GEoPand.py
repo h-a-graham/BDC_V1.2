@@ -322,23 +322,21 @@ def CreateOverlayGeoms(strNet_gdf, inWatArea_gdf, crs, process_name):
     shpLen = len(boundsgeom)
     # counter = 0
     for i, shp in boundsgeom.iterrows():
-        # counter += 1
-        # print('p1')
+
         gdf = gpd.GeoDataFrame(gpd.GeoSeries(shp['geometry']), columns=['geometry'])
-        # print('p2')
+
         bound_matches_index = list(spatial_index.intersection(gdf.bounds.iloc[0]))
-        # print('p3')
+
         matches = inWatArea_gdf.loc[bound_matches_index]
-        # print('p4')
+
         out_gdf = gpd.GeoDataFrame()
-        # print('p5')
+
         matches['merge'] = 'merge'
         matches_diss = matches.dissolve(by='merge')
         out_gdf['geometry'] = gpd.GeoSeries(matches_diss['geometry'])
-        # print('p6')
-        # out_gdf['reach_no'] = shp['reach_no']
+
         gdfList.append(out_gdf)
-    # print('POINT_C: {0}'.format(process_name))
+
 
     clipping_gdf = gpd.GeoDataFrame(pd.concat(gdfList, ignore_index=True))
     clipping_gdf.crs = crs

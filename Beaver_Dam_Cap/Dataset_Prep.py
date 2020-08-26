@@ -12,8 +12,10 @@ from datetime import datetime
 # from matplotlib import pyplot as plt
 
 
-def BDC_setup_main(rivers_root, dem_path, bvi_etc_root, operCatch, os_gridPath, epsg_code, outRoot, **kwargs):
+def BDC_setup_main(rivers_root, dem_path, bvi_etc_root, operCatch, epsg_code, outRoot, **kwargs):
     id_col = kwargs.get('id_column', None)
+
+    os_gridPath = os.path.join(os.path.dirname(__file__), 'Data', 'OSGB_Grid_100km.gpkg')
 
     startTime = datetime.now()
     print("running BDC setup script")
@@ -70,7 +72,7 @@ def BDC_setup_main(rivers_root, dem_path, bvi_etc_root, operCatch, os_gridPath, 
 
         coords, grid_List = get_extents(opCatSelec, os_gridPath, epsg_code)
 
-        get_rivs_arc(rivers_root, opCatSelec, grid_List, outFolder, area, epsg_code)
+        get_rivs(rivers_root, opCatSelec, grid_List, outFolder, area, epsg_code)
         get_inWatArea(bvi_etc_root, opCatSelec, epsg_code, grid_List, outFolder, area)
         get_bvi(bvi_etc_root, epsg_code, coords, outFolder, area, grid_List, opCatSelec)
         get_dem(dem_path, epsg_code, coords, outFolder, area, grid_List, opCatSelec)
@@ -109,7 +111,7 @@ def getFeatures(gdf):
     return [json.loads(gdf.to_json())['features'][0]['geometry']]
 
 
-def get_rivs_arc(riv_root, oc_shp, grid_list, outfold, hyd_num, epsg):
+def get_rivs(riv_root, oc_shp, grid_list, outfold, hyd_num, epsg):
     print("extracting detailed river network features with Op Catch")
 
     oc_area = oc_shp.loc[oc_shp.id == hyd_num].copy()
@@ -320,9 +322,8 @@ def clip(to_clip, clip_shp):
         crs=clip_shp.crs
     )
 
-    clip_gdf = gpd.sjoin(to_clip, union, op='within')
+    clip_gdf = gpd.sjoin(to_clip, union, op='intersects')  # previously 'within': caused deletion of tidal reaches
 
     clip_gdf = clip_gdf.drop(columns=['index_right'])
 
     return clip_gdf
-    # return gpd.overlay(to_clip, union, how='intersection')

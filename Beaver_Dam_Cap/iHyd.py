@@ -15,7 +15,7 @@ import geopandas as gpd
 ## NEED TO ADD A QUICK SUBSET FUNCTION TO DETERMINE OVERLAPPING CEH HYDROMETRIC AREAS!!!!
 
 
-def main(DA, cehpath, opcpath):
+def main(DA, opcpath):
 
 
 
@@ -29,7 +29,7 @@ def main(DA, cehpath, opcpath):
 
     # args = [46, 2, 3, 4, 66]
     # args = [str(region)]
-    args = get_ceh_areas(cehpath, opcpath)
+    args = get_ceh_areas(opcpath)
     print(args)
     cmd = [command, myscript_loc] + args
 
@@ -58,10 +58,11 @@ def main(DA, cehpath, opcpath):
     return DA
 
 
-def get_ceh_areas(ceh_path, opc_path):
+def get_ceh_areas(opc_path):
     rating_img_root = os.path.dirname(opc_path)
 
     print("retrieving CEH Hydrometric Area Values")
+    ceh_path = os.path.join(os.path.dirname(__file__), 'Data', 'GB_CEH_HA.gpkg')
 
     ceh_gp = gpd.read_file(ceh_path)
     opc_gp = gpd.read_file(opc_path)
