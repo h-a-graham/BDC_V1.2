@@ -20,13 +20,13 @@ def main(in_network):
 
     net_gpd = in_network.reset_index(drop=True)
 
-    net_gpd.loc[net_gpd['iVeg_40'] < 0, 'iVeg_40'] = 0
-    net_gpd.loc[net_gpd['iVeg_10'] < 0, 'iVeg_10'] = 0
-    net_gpd.loc[net_gpd['iVeg_40'] > 5, 'iVeg_40'] = 5
-    net_gpd.loc[net_gpd['iVeg_10'] > 5, 'iVeg_10'] = 5
+    net_gpd.loc[net_gpd['BFI_40m'] < 0, 'BFI_40m'] = 0
+    net_gpd.loc[net_gpd['BFI_10m'] < 0, 'BFI_10m'] = 0
+    net_gpd.loc[net_gpd['BFI_40m'] > 5, 'BFI_40m'] = 5
+    net_gpd.loc[net_gpd['BFI_10m'] > 5, 'BFI_10m'] = 5
 
-    riparian_array = net_gpd['iVeg_40'].values
-    streamside_array = net_gpd['iVeg_10'].values
+    riparian_array = net_gpd['BFI_40m'].values
+    streamside_array = net_gpd['BFI_10m'].values
 
     riparian = ctrl.Antecedent(np.arange(0, 5, 0.001), 'input1')
     streamside = ctrl.Antecedent(np.arange(0, 5, 0.001), 'input2')
@@ -90,7 +90,7 @@ def main(in_network):
         veg_fis.compute()
         out[i] = veg_fis.output['result']
 
-    net_gpd['oVC_EX'] = out
+    net_gpd['V_BDC'] = out
 
     # net_gpd.to_file(in_network, driver="GPKG")
 

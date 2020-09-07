@@ -15,43 +15,39 @@ import geopandas as gpd
 ## NEED TO ADD A QUICK SUBSET FUNCTION TO DETERMINE OVERLAPPING CEH HYDROMETRIC AREAS!!!!
 
 
-def main(DA, opcpath):
+def main(DA, opcpath, r_path):
+
+    # print('Adding Qlow and Q2 to network')
 
 
-
-    print('Adding Qlow and Q2 to network')
-
-
-    command = os.path.abspath("C:/Program Files/R/R-3.6.3/bin/Rscript.exe")
+    command = os.path.abspath(r_path)
     scriptHome = os.path.dirname(__file__)
-    print(scriptHome)
+    # print(scriptHome)
     myscript_loc = os.path.join(scriptHome, "Extracting_data_from_CEH_V2.R")
 
-    # args = [46, 2, 3, 4, 66]
-    # args = [str(region)]
     args = get_ceh_areas(opcpath)
-    print(args)
+    # print(args)
     cmd = [command, myscript_loc] + args
 
-    x = subprocess.check_output(cmd, universal_newlines=True)
-    print(x)
+    x = subprocess.check_output(cmd, universal_newlines=True, stderr=subprocess.DEVNULL)
+    # print(x)
     coefs = [float(i) for i in x.split()]
 
     Q2coef = coefs[0:2]
-    print("Q2 coefs are {0} and {1}".format(Q2coef[0], Q2coef[1]))
+    # print("Q2 coefs are {0} and {1}".format(Q2coef[0], Q2coef[1]))
 
     Q80coef = coefs[2:4]
-    print("Q80 coefs are {0} and {1}".format(Q80coef[0], Q80coef[1]))
+    # print("Q80 coefs are {0} and {1}".format(Q80coef[0], Q80coef[1]))
 
-    DA['iHyd_QLow'] = Q80coef[0] * DA['iGeo_DA'] ** Q80coef[1]
+    DA['Q80_Flow'] = Q80coef[0] * DA['Drain_Area'] ** Q80coef[1]
 
-    DA['iHyd_Q2'] = Q2coef[0] * DA['iGeo_DA'] ** Q2coef[1]
+    DA['Q2_Flow'] = Q2coef[0] * DA['Drain_Area'] ** Q2coef[1]
 
-    DA.loc[DA['iHyd_Q2'] < DA['iHyd_QLow'], 'iHyd_Q2'] = DA['iHyd_QLow'] + 5
+    # DA.loc[DA['iHyd_Q2'] < DA['iHyd_QLow'], 'iHyd_Q2'] = DA['iHyd_QLow'] + 5
 
-    DA['iHyd_SPLow'] = (1000 * 9.80665) * DA['iHyd_QLow'] * DA['iGeo_Slope']
+    DA['Q80_StrPow'] = (1000 * 9.80665) * DA['Q80_Flow'] * DA['Slope_perc']
 
-    DA['iHyd_SP2'] = (1000 * 9.80665) * DA['iGeo_Slope'] * DA['iHyd_Q2']
+    DA['Q2_StrPow'] = (1000 * 9.80665) * DA['Q2_Flow'] * DA['Slope_perc']
 
     # DA.to_file(in_network, driver="GPKG")
 
@@ -61,7 +57,7 @@ def main(DA, opcpath):
 def get_ceh_areas(opc_path):
     rating_img_root = os.path.dirname(opc_path)
 
-    print("retrieving CEH Hydrometric Area Values")
+    # print("retrieving CEH Hydrometric Area Values")
     ceh_path = os.path.join(os.path.dirname(__file__), 'Data', 'GB_CEH_HA.gpkg')
 
     ceh_gp = gpd.read_file(ceh_path)

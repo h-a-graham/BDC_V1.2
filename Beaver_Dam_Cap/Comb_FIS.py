@@ -19,17 +19,17 @@ def main(net_gpd):
     max_DA_thresh = 75
     max_Width_thresh = 20
 
-    net_gpd.loc[net_gpd['oVC_EX'] < 0, 'oVC_EX'] = 0
-    net_gpd.loc[net_gpd['oVC_EX'] > 45, 'oVC_EX'] = 44
-    net_gpd.loc[net_gpd['iHyd_SP2'] < 0, 'iHyd_SP2'] = 0.001
-    net_gpd.loc[net_gpd['iHyd_SP2'] > 10000, 'iHyd_SP2'] = 10000
-    net_gpd.loc[net_gpd['iHyd_SPLow'] < 0, 'iHyd_SPLow'] = 0.001
-    net_gpd.loc[net_gpd['iHyd_SPLow'] > 10000, 'iHyd_SPLow'] = 10000
+    net_gpd.loc[net_gpd['V_BDC'] < 0, 'V_BDC'] = 0
+    net_gpd.loc[net_gpd['V_BDC'] > 45, 'V_BDC'] = 44
+    net_gpd.loc[net_gpd['Q2_StrPow'] < 0, 'Q2_StrPow'] = 0.001
+    net_gpd.loc[net_gpd['Q2_StrPow'] > 10000, 'Q2_StrPow'] = 10000
+    net_gpd.loc[net_gpd['Q80_StrPow'] < 0, 'Q80_StrPow'] = 0.001
+    net_gpd.loc[net_gpd['Q80_StrPow'] > 10000, 'Q80_StrPow'] = 10000
 
-    ovcex_array = net_gpd['oVC_EX'].values
-    ihydsp2_array = net_gpd['iHyd_SP2'].values
-    ihydsplow_array = net_gpd['iHyd_SPLow'].values
-    igeoslope_array = net_gpd['iGeo_Slope'].values
+    ovcex_array = net_gpd['V_BDC'].values
+    ihydsp2_array = net_gpd['Q2_StrPow'].values
+    ihydsplow_array = net_gpd['Q80_StrPow'].values
+    igeoslope_array = net_gpd['Slope_perc'].values
 
     ovc = ctrl.Antecedent(np.arange(0, 45, 0.225), 'input1')
     sp2 = ctrl.Antecedent(np.arange(0, 10000, 1), 'input2')
@@ -152,28 +152,17 @@ def main(net_gpd):
 
     net_gpd['BDC'] = out
 
-    net_gpd.loc[net_gpd['oVC_EX'] <= 0, 'BDC'] = 0
-    net_gpd.loc[net_gpd['iHyd_SPLow'] > 190, 'BDC'] = 0
-    net_gpd.loc[net_gpd['iGeo_Slope'] >= 0.23, 'BDC'] = 0
-    net_gpd.loc[net_gpd['iGeo_Width'] >= float(max_Width_thresh), 'BDC'] = 0
+    net_gpd.loc[net_gpd['V_BDC'] <= 0, 'BDC'] = 0
+    net_gpd.loc[net_gpd['Q80_StrPow'] > 190, 'BDC'] = 0
+    net_gpd.loc[net_gpd['Slope_perc'] >= 0.23, 'BDC'] = 0
+    net_gpd.loc[net_gpd['Width_m'] >= float(max_Width_thresh), 'BDC'] = 0
 
-    net_gpd.loc[net_gpd['iGeo_DA'] >= float(max_DA_thresh), 'BDC'] = 0
+    net_gpd.loc[net_gpd['Drain_Area'] >= float(max_DA_thresh), 'BDC'] = 0
     net_gpd.loc[(net_gpd['Str_order'] == 5) & (net_gpd['BDC'] >= 1), 'BDC'] = 0.9
     net_gpd.loc[net_gpd['Str_order'] >= 6, 'BDC'] = 0
-    net_gpd.loc[net_gpd['BDC'] > net_gpd['oVC_EX'], 'BDC'] = net_gpd['oVC_EX']
+    net_gpd.loc[net_gpd['BDC'] > net_gpd['V_BDC'], 'BDC'] = net_gpd['V_BDC']
 
     # net_gpd.to_file(in_network, driver='GPKG')
 
     return net_gpd
 
-    # import pandas as pd
-    # pd.set_option('display.max_rows', 500)
-    # pd.set_option('display.max_columns', 500)
-    # pd.set_option('display.width', 1000)
-    #
-    # print(net_gpd.tail())
-    # print('top')
-
-    # from matplotlib import pyplot as plt
-    # net_gpd.plot(column='BDC')
-    # plt.show()

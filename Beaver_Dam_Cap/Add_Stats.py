@@ -11,7 +11,7 @@ startTime = datetime.now()
 
 def main(bdc_gdf, save_path):
 
-    bdc_gdf = rename_BDC_cols(bdc_gdf)
+    # bdc_gdf = rename_BDC_cols(bdc_gdf)
 
     bdc_gdf = Add_Prob_Cols(bdc_gdf)
 
@@ -28,31 +28,11 @@ def BDC_finclean(geo_df):
 
     col_list_order = ['BDC', 'BDC_cat', 'BFI_10m', 'BFI_40m', 'BFI_cat', 'V_BDC', 'Dam_Prob', 'Dam_ProbLC',
                       'Dam_ProbUC', 'For_Prob', 'For_ProbLC', 'For_ProbUC', 'Est_nDam', 'Est_nDamLC', 'Est_nDamUC',
-                      'Length_m', 'Width_m', 'Slope_perc', 'Drain_Area', 'Chan_Area', 'Elev_Max', 'Elev_Min',
-                      'Str_order', 'Q2_Flow', 'Q80_Flow', 'Q2_StrPow', 'Q80_StrPow', 'reach_no', 'geometry']
+                      'Length_m', 'Width_m', 'Slope_perc', 'Drain_Area', 'Str_order', 'Q2_Flow', 'Q80_Flow',
+                      'Q2_StrPow', 'Q80_StrPow', 'reach_no', 'geometry']
 
     geo_df = geo_df[col_list_order]
 
-    return geo_df
-
-def rename_BDC_cols(geo_df):
-    """function to rename columns to something more verbose..."""
-    # print('renaming columns')
-    #rename columns to make more readable
-    geo_df = geo_df.rename(columns={"iGeo_DA": "Drain_Area",
-                                    "iGeo_Len": "Length_m",
-                                    "iGeo_Slope": "Slope_perc",
-                                    "iGeo_Width": "Width_m",
-                                    "iHyd_Q2": "Q2_Flow",
-                                    "iHyd_QLow": "Q80_Flow",
-                                    "iHyd_SP2": "Q2_StrPow",
-                                    "iHyd_SPLow": "Q80_StrPow",
-                                    "iVeg_10": "BFI_10m",
-                                    "iVeg_40": "BFI_40m",
-                                    "oVC_EX": "V_BDC",
-                                    'iGeo_Area': 'Chan_Area',
-                                    'iGeo_ElMax': 'Elev_Max',
-                                    'iGeo_ElMin': 'Elev_Min'})
     return geo_df
 
 
