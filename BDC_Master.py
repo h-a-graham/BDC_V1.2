@@ -16,7 +16,7 @@ from datetime import datetime
 
 
 def set_vars():
-
+    """ function to return all user defined variables"""
     # ------------- Don't edit:
     rivers_root = os.path.abspath("C:/HG_Projects/Hugh_BDC_Files/GB_Beaver_modelling/Raw_Data/mastermap-water/2018_10/gml")
 
@@ -33,15 +33,13 @@ def set_vars():
                                 "CEH_catchments/GB_CEH_HAs_V2.gpkg")
     outRoot = os.path.abspath("D:/HG_Work/GB_Beaver_Data/BeaverNetwork_GB_v2_0")
 
-    # OutGpkgName = 'BeaverNetwork_GB'
-
     # operCatch = os.path.abspath("C:/HG_Projects/Hugh_BDC_Files/GB_Beaver_modelling/"
     #                             "CEH_catchments/TestCase2.gpkg")
     #
     # operCatch = os.path.abspath("C:/HG_Projects/Hugh_BDC_Files/GB_Beaver_modelling/"
     #                             "EA_catchments/CH_OC_Test.gpkg")
-    #
-    # outRoot = os.path.abspath("D:/HG_Work/GB_Beaver_Data/Test_CASE2")
+    # #
+    # outRoot = os.path.abspath("D:/HG_Work/GB_Beaver_Data/Test_CASE4")
 
     OutGpkgName = 'BeaverNetwork_GB'
     gpkg_layer_prefix = 'BeaverNetwork_CEH_HA'
@@ -55,11 +53,12 @@ def set_vars():
     id_column = 'HA_NUM'  # Set as None where no id column exists - one will be created.
 
     return rivers_root, dem_path, bvi_etc_root, operCatch, outRoot, OutGpkgName, epsg_code, run_prep, id_column, \
-           r_exe, osgeo_path, gpkg_layer_prefix, run_terrain
+        r_exe, osgeo_path, gpkg_layer_prefix, run_terrain
 
 
 
 def bdc_data_prep(rivers_root, dem_path, bvi_etc_root, operCatch, outRoot, epsg_code,  run_prep, id_col):
+    """function to call bdc prep script"""
     if run_prep is True:
         print("running data prep script to organise inputs for all target Dam Capacity Areas/ Catchments")
         Dataset_Prep.BDC_setup_main(rivers_root, dem_path, bvi_etc_root, operCatch, epsg_code, outRoot,
@@ -70,7 +69,7 @@ def bdc_data_prep(rivers_root, dem_path, bvi_etc_root, operCatch, outRoot, epsg_
 
 
 def terrain_processing(outRoot, epsg_code, osgeo, direc):
-    """ separate function to run terrain processing """
+    """ function to run terrain processing """
     # ------ Define intermediate files --------
     ocNum = direc[-4:]
     home = os.path.join(outRoot, direc)
@@ -82,7 +81,6 @@ def terrain_processing(outRoot, epsg_code, osgeo, direc):
     gdb_name = "scratch_OC{0}".format(ocNum)
     scratch_gdb = os.path.join(home, gdb_name)
     spltLinesP2 = os.path.join(scratch_gdb, "seg_network_b.gpkg")
-
 
     if os.path.isfile(split_lines):
         # working reaches already exist, skip split lines
@@ -108,6 +106,7 @@ def terrain_processing(outRoot, epsg_code, osgeo, direc):
 
 
 def bdc_processing(outRoot, r_exe, pbar, direc):
+    """function to call bdc processing scripts"""
     # ------ Define intermediate files --------
     ocNum = direc[-4:]
     home = os.path.join(outRoot, direc)
@@ -123,12 +122,11 @@ def bdc_processing(outRoot, r_exe, pbar, direc):
     DrAreaRas = os.path.join(home, "DrainArea_sqkm.tif")
     spltLinesP2 = os.path.join(scratch_gdb, "seg_network_b.gpkg")
 
-
     if os.path.isfile(os.path.join(outRoot, direc, "BDC_OC{0}/Output_BDC_OC{0}.gpkg".format(direc[-4:]))):
         print("Operational Catchment {0} already completed - pass".format(direc[-4:]))
     else:
 
-        #run buffer creation/raster stats modeule
+        # run buffer creation/raster stats modeule
         bdc_gdf, bdc_net = BDC_tab_GEoPand.main(home, spltLinesP2, DEM_burn, in_waterArea, BVI_raster, DrAreaRas,
                                                 progress_bar=pbar)  # current
 
@@ -144,11 +142,13 @@ def bdc_processing(outRoot, r_exe, pbar, direc):
         # run module to add probability and actual dam number stats to reaches
         Add_Stats.main(bdc_gdf, bdc_net)
 
-        return "done..."
+    return "done..."  # perhaps not required but in case the parallrun needs something returned...
+
 
 def parallel_terrain(root, crs, osgeo_p, run):
-    """Function to run the line splitting and terrain processing in parallel"""
-    # Notes could do with adding a check to see if already run... or just an arg to skip?
+    """Function to run the line splitting and terrain processing on multiple cores"""
+    """Note: the limitation here is RAM not CPU with 64GB of RAM 3 cores is fine."""
+
     if run is True:
         direc_list = next(os.walk(root))[1]
 
@@ -169,8 +169,8 @@ def parallel_terrain(root, crs, osgeo_p, run):
 
 
 def once_core_terrain(root, crs, osgeo_p, run):
-    """Function to run the line splitting and terrain processing"""
-    # Notes could do with adding a check to see if already run... or just an arg to skip?
+    """Function to run the line splitting and terrain processing on a single core"""
+
     if run is True:
         direc_list = next(os.walk(root))[1]
 
@@ -182,19 +182,17 @@ def once_core_terrain(root, crs, osgeo_p, run):
 
 
 def parallel_bdc(root, gpkg_n, gpkg_pref, r_exe_p):
-    """ """
+    """Function to run the bdc processing on multiple cores"""
+    """Note: cpu is main limting factor so n cpus - 1 should work fine."""
+
     direc_list = next(os.walk(root))[1]
 
-    num_cores = multiprocessing.cpu_count() - 1  # drop by one to maintain some capacity?
+    num_cores = multiprocessing.cpu_count() - 1
     n_split = len(direc_list)
     if n_split < num_cores:
         num_cores = n_split
 
-    # direc_chunk = chunks(direc_list, num_cores)
-
     function = partial(bdc_processing, root, r_exe_p, True)
-    # with multiprocessing.Pool(num_cores) as p:
-    #     r = list(tqdm(p.imap(function, direc_list), total=len(direc_list)))
 
     with multiprocessing.Pool(processes=num_cores) as p:
         max_ = len(direc_list)
@@ -208,7 +206,8 @@ def parallel_bdc(root, gpkg_n, gpkg_pref, r_exe_p):
 
 
 def one_core_bdc(root, gpkg_n, gpkg_pref, r_exe_p):
-    """ """
+    """ function to run bdc processing on a single core. progress bar is initiated in the bdc_tab_GeoPand.py"""
+
     direc_list = next(os.walk(root))[1]
 
     for d in direc_list:

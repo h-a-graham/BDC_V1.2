@@ -1,20 +1,12 @@
 # Notes:
 # Add prefix to naming structure?
 # parallel structure removed to allow for higher level of parallelism - should improve speed.
-#
-# from __future__ import division
-# -------------------------------------------------------------------------------
-# Name:
-# Purpose:     Builds the initial table to run through the BRAT tools
-#
-# Author:      Hugh Graham
-#
-# -------------------------------------------------------------------------------
+# During the creation of buffers - errors often occur (though not that often) consider possible fixes for:
+# - TopologyException: found non-noded intersection between LINESTRING ...
+# - TopologyException: side location conflict at ...
+# - TopologyException: EdgeRing::computePoints: found null Directed Edge
 
-
-##############################################
-########## IMPORTS ##########################
-#############################################
+# --------------- IMPORTS --------------------
 import numpy as np
 import os
 import geopandas as gpd
@@ -27,8 +19,6 @@ from rasterio.mask import mask
 from tqdm import tqdm
 import warnings
 # import matplotlib.pyplot as plt # leave for debugging
-
-############# START TIME ##############
 
 
 def main(path, seg_network_b, sb_DEM, in_water_vec, coded_vegIn, DrAreaPathIn, progress_bar):
@@ -248,30 +238,36 @@ def generate_reach_buffer(reach_shape, inland_wat_SI, inlandwatergdf, prebuff, p
             gdf_sjoin['diss_key'] = 1
             gdf_sjoin = gdf_sjoin.dissolve(by='diss_key')
 
-        clipped_gdf['geometry'] = gdf_sjoin['geometry'].values
-        # clipped_gdf.crs = reach_shape.crs
+        try:
+            clipped_gdf['geometry'] = gdf_sjoin['geometry'].values
+        except ValueError as e:
+            warnings.warn("The following error was thrown: \n "
+                          "{0} \n"
+                          "Using 0.5m buffer as river area...")
+            clipped_gdf['geometry'] = check_buff['geometry'].values
 
     if postbuff is None:
         final_buff = clipped_gdf.copy()
     else:
         buff_riv_area = gpd.GeoDataFrame(clipped_gdf.buffer(postbuff), columns=['geometry'], crs=reach_shape.crs)
+
+        possible_matches['diss_key'] = 1
+        possible_matches = possible_matches.dissolve(by='diss_key')
+
         try:
             final_buff = gpd.overlay(buff_riv_area, possible_matches, how='difference')
+
         except errors.TopologicalError:
             try:
-                possible_matches['diss_key'] = 1
-                possible_matches = possible_matches.dissolve(by='diss_key')
-                final_buff = gpd.overlay(buff_riv_area, possible_matches, how='difference')
-            except errors.TopologicalError:
-                try:
-                    final_buff = gpd.overlay(buff_riv_area, clipped_gdf, how='difference') # last resort...
-                except errors.TopologicalError as e:
-                    raise e
+                final_buff = gpd.overlay(buff_riv_area, clipped_gdf, how='difference')
+
+            except errors.TopologicalError as e:
+
+                final_buff = buff_riv_area.copy()  # last resort - very rarely initiated...
+
 
     if len(final_buff) < 1:  # if the river area is wider than the buffer this is required to avoid NULL geometry
-            # print("River wider than 40m")
-            final_buff = reach_pre_buff.copy()
-
+        final_buff = reach_pre_buff.copy()
 
     return final_buff
 
@@ -294,21 +290,21 @@ def explode(indf, crs):
     outdf.crs = crs
     return outdf
 
+
 def zonal_ras_stat(gdf, ras_obj, stat, touched):
     """ Function to carry out Zonal statistics using Rasterio """
+
     # extract the geometry in GeoJSON format
     geoms = gdf.geometry.values  # list of shapely geometries
     try:
         geoms = [mapping(geoms[0])] # transform to GeJSON format
-    except IndexError as e: # this error is raised when for some reason an empty geometry is provided here...
+    except IndexError as e:  # error raised when an empty geometry is provided here... Hopefully remove soon...
         print(gdf)
         print(stat)
         print(gdf.geometry.values)
-
         raise e
 
     # extract the raster values values within the polygon
-
     try:
         out_image, out_transform = mask(ras_obj, geoms, crop=True, all_touched=touched, nodata=-999)
     except ValueError:
@@ -334,13 +330,6 @@ def GetTopHalfMean(stat_df):
     unmasked = stat_df[stat_df.mask == False]
     Newdf = np.ma.sort(unmasked)
     lower, upper = np.array_split(Newdf, 2)
-
-    # with warnings.catch_warnings():  # wrapped in with warnings.catchwarnings to fix empty slices.
-    #     warnings.filterwarnings('error')
-    #     try:
-    #         statval = np.nanmean(upper)
-    #     except Warning as e:
-    #         statval = 0
 
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", category=RuntimeWarning)
