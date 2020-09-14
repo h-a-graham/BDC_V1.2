@@ -21,7 +21,7 @@ def main(root, save_folder, RivBasDis, Area_Def, save_BDC, sumstat_path, **kwarg
 
     if merged_bdc is None:
         print('collecting features...')
-        feature_list = glob(os.path.join(root, 'Op_Catch_*', 'BDC_OC*', 'Output_BDC_OC*.shp'))
+        feature_list = glob(os.path.join(root, 'Op_Catch_*', 'BDC_OC*', 'Output_BDC_OC*.gpkg'))
         Nat_bdc_gdf = concat_gdf_list(feature_list)
     else:
         print('user provided geodatafrmae...')
@@ -40,9 +40,9 @@ def main(root, save_folder, RivBasDis, Area_Def, save_BDC, sumstat_path, **kwarg
 
         clip_bdc = clip(Nat_bdc_gdf, gdf_i)
 
-        clip_bdc = rename_BDC_cols(clip_bdc)
-        clip_bdc = Add_Prob_Cols(clip_bdc)
-        clip_bdc = predict_dam_nums(clip_bdc)
+        # clip_bdc = rename_BDC_cols(clip_bdc)
+        # clip_bdc = Add_Prob_Cols(clip_bdc)
+        # clip_bdc = predict_dam_nums(clip_bdc)
 
         if len(clip_bdc.index) == 0:
             warn("The following row from supplied polygon does not intersect any river lines and will not be added:")
@@ -54,7 +54,7 @@ def main(root, save_folder, RivBasDis, Area_Def, save_BDC, sumstat_path, **kwarg
 
         #clean up final unwanted columns before output
 
-        clip_bdc = BDC_finclean(clip_bdc)
+        # clip_bdc = BDC_finclean(clip_bdc)
 
         if Area_Def == 'RiverBasinDistrict':
             rbd_name = row['WB_name'].replace(' ', '_')
@@ -70,7 +70,7 @@ def main(root, save_folder, RivBasDis, Area_Def, save_BDC, sumstat_path, **kwarg
                  "Using generic catchment naming structure instead. ")
             rbd_name = 'Catchment_{0}'.format(idx)
 
-        rbd_fold_path = os.path.join(save_folder, rbd_name + '_BDC')
+        rbd_fold_path = os.path.join(save_folder, 'BeaverNetwork_' + rbd_name)
 
         if save_BDC is True:
             if os.path.isdir(rbd_fold_path):
@@ -78,7 +78,7 @@ def main(root, save_folder, RivBasDis, Area_Def, save_BDC, sumstat_path, **kwarg
             else:
                 os.mkdir(rbd_fold_path)
 
-            bdc_out_path = os.path.join(rbd_fold_path, rbd_name + '_BDC.shp')
+            bdc_out_path = os.path.join(rbd_fold_path, 'BeaverNetwork_' + rbd_name + '.shp')
             clip_bdc.to_file(bdc_out_path, driver="ESRI Shapefile")
 
 
@@ -153,130 +153,130 @@ def sumstat_finclean(geo_df):
     return geo_df
 
 
-def BDC_finclean(geo_df):
-    """function to drop irrelevant columns and appropriately order remaining columns..."""
-    geo_df.drop(['Actual_BDC', 'Actual_BDC_b'], axis=1)
+# def BDC_finclean(geo_df):
+#     """function to drop irrelevant columns and appropriately order remaining columns..."""
+#     geo_df.drop(['Actual_BDC', 'Actual_BDC_b'], axis=1)
+#
+#     col_list_order = ['BDC', 'BDC_cat', 'BFI_10m', 'BFI_40m', 'BFI_cat', 'V_BDC', 'Dam_Prob', 'Dam_ProbLC',
+#                       'Dam_ProbUC', 'For_Prob', 'For_ProbLC', 'For_ProbUC', 'Est_nDam', 'Est_nDamLC', 'Est_nDamUC',
+#                       'Length_m', 'Width_m', 'Slope_perc', 'Drain_Area', 'Str_order', 'Q2_Flow', 'Q80_Flow',
+#                       'Q2_StrPow', 'Q80_StrPow', 'reach_no', 'geometry']
+#
+#     geo_df = geo_df[col_list_order]
+#
+#     return geo_df
 
-    col_list_order = ['BDC', 'BDC_cat', 'BFI_10m', 'BFI_40m', 'BFI_cat', 'V_BDC', 'Dam_Prob', 'Dam_ProbLC',
-                      'Dam_ProbUC', 'For_Prob', 'For_ProbLC', 'For_ProbUC', 'Est_nDam', 'Est_nDamLC', 'Est_nDamUC',
-                      'Length_m', 'Width_m', 'Slope_perc', 'Drain_Area', 'Str_order', 'Q2_Flow', 'Q80_Flow',
-                      'Q2_StrPow', 'Q80_StrPow', 'reach_no', 'geometry']
-
-    geo_df = geo_df[col_list_order]
-
-    return geo_df
-
-def rename_BDC_cols(geo_df):
-    """function to rename columns to something more verbose..."""
-    # print('renaming columns')
-
-    #drop unwanted columns
-    geo_df = geo_df.drop(['iGeo_Area', 'iGeo_ElMax', 'iGeo_ElMin'], axis=1)
-
-    #rename columns to make more readable
-    geo_df = geo_df.rename(columns={"iGeo_DA": "Drain_Area",
-                                    "iGeo_Len": "Length_m",
-                                    "iGeo_Slope": "Slope_perc",
-                                    "iGeo_Width": "Width_m",
-                                    "iHyd_Q2": "Q2_Flow",
-                                    "iHyd_QLow": "Q80_Flow",
-                                    "iHyd_SP2": "Q2_StrPow",
-                                    "iHyd_SPLow": "Q80_StrPow",
-                                    "iVeg_10": "BFI_10m",
-                                    "iVeg_40": "BFI_40m",
-                                    "oVC_EX": "V_BDC"})
-    return geo_df
-
-
-def Add_Prob_Cols(geo_df):
-    """function to add probability estimates to reaches based on BDC and BFI categories"""
-    # print('Adding Bayesian Probability estimates by BDC category')
-
-    geo_df['BDC_cat'] = 'None'
-    geo_df.loc[(geo_df.BDC > 0) & (geo_df.BDC <= 1), 'BDC_cat'] = 'Rare'
-    geo_df.loc[(geo_df.BDC > 1) & (geo_df.BDC <= 4), 'BDC_cat'] = 'Occasional'
-    geo_df.loc[(geo_df.BDC > 4) & (geo_df.BDC <= 15), 'BDC_cat'] = 'Frequent'
-    geo_df.loc[geo_df.BDC > 15, 'BDC_cat'] = 'Pervasive'
-
-    # set up a BFI category column
-    geo_df['BFI_cat'] = 'Unsuitable'
-    geo_df.loc[(geo_df.BFI_40m > 1) & (geo_df.BFI_40m <= 2), 'BFI_cat'] = 'Low'
-    geo_df.loc[(geo_df.BFI_40m > 2) & (geo_df.BFI_40m <= 3), 'BFI_cat'] = 'Moderate'
-    geo_df.loc[(geo_df.BFI_40m > 3) & (geo_df.BFI_40m <= 4), 'BFI_cat'] = 'High'
-    geo_df.loc[geo_df.BFI_40m > 4, 'BFI_cat'] = 'Preferred'
-
-    # Add Dam Probabilty Estimates
-    geo_df['Dam_Prob'] = 0
-    geo_df.loc[geo_df['BDC_cat'] == 'Rare', 'Dam_Prob'] = 0.032
-    geo_df.loc[geo_df['BDC_cat'] == 'Occasional', 'Dam_Prob'] = 0.055
-    geo_df.loc[geo_df['BDC_cat'] == 'Frequent', 'Dam_Prob'] = 0.075
-    geo_df.loc[geo_df['BDC_cat'] == 'Pervasive', 'Dam_Prob'] = 0.133
-
-    geo_df['Dam_ProbLC'] = 0
-    geo_df.loc[geo_df['BDC_cat'] == 'Rare', 'Dam_ProbLC'] = 0.018
-    geo_df.loc[geo_df['BDC_cat'] == 'Occasional', 'Dam_ProbLC'] = 0.031
-    geo_df.loc[geo_df['BDC_cat'] == 'Frequent', 'Dam_ProbLC'] = 0.045
-    geo_df.loc[geo_df['BDC_cat'] == 'Pervasive', 'Dam_ProbLC'] = 0.093
-
-    geo_df['Dam_ProbUC'] = 0.003
-    geo_df.loc[geo_df['BDC_cat'] == 'Rare', 'Dam_ProbUC'] = 0.061
-    geo_df.loc[geo_df['BDC_cat'] == 'Occasional', 'Dam_ProbUC'] = 0.1
-    geo_df.loc[geo_df['BDC_cat'] == 'Frequent', 'Dam_ProbUC'] = 0.125
-    geo_df.loc[geo_df['BDC_cat'] == 'Pervasive', 'Dam_ProbUC'] = 0.189
-
-    # Add Foraging Probabilty Estimates
-    geo_df['For_Prob'] = 0.001
-    geo_df.loc[geo_df['BFI_cat'] == 'Low', 'For_Prob'] = 0.015
-    geo_df.loc[geo_df['BFI_cat'] == 'Moderate', 'For_Prob'] = 0.02
-    geo_df.loc[geo_df['BFI_cat'] == 'High', 'For_Prob'] = 0.021
-    geo_df.loc[geo_df['BFI_cat'] == 'Preferred', 'For_Prob'] = 0.035
-
-    geo_df['For_ProbLC'] = 0.001
-    geo_df.loc[geo_df['BFI_cat'] == 'Low', 'For_ProbLC'] = 0.014
-    geo_df.loc[geo_df['BFI_cat'] == 'Moderate', 'For_ProbLC'] = 0.018
-    geo_df.loc[geo_df['BFI_cat'] == 'High', 'For_ProbLC'] = 0.019
-    geo_df.loc[geo_df['BFI_cat'] == 'Preferred', 'For_ProbLC'] = 0.033
-
-    geo_df['For_ProbUC'] = 0.001
-    geo_df.loc[geo_df['BFI_cat'] == 'Low', 'For_ProbUC'] = 0.017
-    geo_df.loc[geo_df['BFI_cat'] == 'Moderate', 'For_ProbUC'] = 0.022
-    geo_df.loc[geo_df['BFI_cat'] == 'High', 'For_ProbUC'] = 0.024
-    geo_df.loc[geo_df['BFI_cat'] == 'Preferred', 'For_ProbUC'] = 0.037
-
-    return geo_df
+# def rename_BDC_cols(geo_df):
+#     """function to rename columns to something more verbose..."""
+#     # print('renaming columns')
+#
+#     #drop unwanted columns
+#     geo_df = geo_df.drop(['iGeo_Area', 'iGeo_ElMax', 'iGeo_ElMin'], axis=1)
+#
+#     #rename columns to make more readable
+#     geo_df = geo_df.rename(columns={"iGeo_DA": "Drain_Area",
+#                                     "iGeo_Len": "Length_m",
+#                                     "iGeo_Slope": "Slope_perc",
+#                                     "iGeo_Width": "Width_m",
+#                                     "iHyd_Q2": "Q2_Flow",
+#                                     "iHyd_QLow": "Q80_Flow",
+#                                     "iHyd_SP2": "Q2_StrPow",
+#                                     "iHyd_SPLow": "Q80_StrPow",
+#                                     "iVeg_10": "BFI_10m",
+#                                     "iVeg_40": "BFI_40m",
+#                                     "oVC_EX": "V_BDC"})
+#     return geo_df
 
 
-def predict_dam_nums(geo_df):
-    """function to match Actual BDC values with those from the ZINB predicted values to estimate dam numbers"""
+# def Add_Prob_Cols(geo_df):
+#     """function to add probability estimates to reaches based on BDC and BFI categories"""
+#     # print('Adding Bayesian Probability estimates by BDC category')
+#
+#     geo_df['BDC_cat'] = 'None'
+#     geo_df.loc[(geo_df.BDC > 0) & (geo_df.BDC <= 1), 'BDC_cat'] = 'Rare'
+#     geo_df.loc[(geo_df.BDC > 1) & (geo_df.BDC <= 4), 'BDC_cat'] = 'Occasional'
+#     geo_df.loc[(geo_df.BDC > 4) & (geo_df.BDC <= 15), 'BDC_cat'] = 'Frequent'
+#     geo_df.loc[geo_df.BDC > 15, 'BDC_cat'] = 'Pervasive'
+#
+#     # set up a BFI category column
+#     geo_df['BFI_cat'] = 'Unsuitable'
+#     geo_df.loc[(geo_df.BFI_40m > 1) & (geo_df.BFI_40m <= 2), 'BFI_cat'] = 'Low'
+#     geo_df.loc[(geo_df.BFI_40m > 2) & (geo_df.BFI_40m <= 3), 'BFI_cat'] = 'Moderate'
+#     geo_df.loc[(geo_df.BFI_40m > 3) & (geo_df.BFI_40m <= 4), 'BFI_cat'] = 'High'
+#     geo_df.loc[geo_df.BFI_40m > 4, 'BFI_cat'] = 'Preferred'
+#
+#     # Add Dam Probabilty Estimates
+#     geo_df['Dam_Prob'] = 0
+#     geo_df.loc[geo_df['BDC_cat'] == 'Rare', 'Dam_Prob'] = 0.032
+#     geo_df.loc[geo_df['BDC_cat'] == 'Occasional', 'Dam_Prob'] = 0.055
+#     geo_df.loc[geo_df['BDC_cat'] == 'Frequent', 'Dam_Prob'] = 0.075
+#     geo_df.loc[geo_df['BDC_cat'] == 'Pervasive', 'Dam_Prob'] = 0.133
+#
+#     geo_df['Dam_ProbLC'] = 0
+#     geo_df.loc[geo_df['BDC_cat'] == 'Rare', 'Dam_ProbLC'] = 0.018
+#     geo_df.loc[geo_df['BDC_cat'] == 'Occasional', 'Dam_ProbLC'] = 0.031
+#     geo_df.loc[geo_df['BDC_cat'] == 'Frequent', 'Dam_ProbLC'] = 0.045
+#     geo_df.loc[geo_df['BDC_cat'] == 'Pervasive', 'Dam_ProbLC'] = 0.093
+#
+#     geo_df['Dam_ProbUC'] = 0.003
+#     geo_df.loc[geo_df['BDC_cat'] == 'Rare', 'Dam_ProbUC'] = 0.061
+#     geo_df.loc[geo_df['BDC_cat'] == 'Occasional', 'Dam_ProbUC'] = 0.1
+#     geo_df.loc[geo_df['BDC_cat'] == 'Frequent', 'Dam_ProbUC'] = 0.125
+#     geo_df.loc[geo_df['BDC_cat'] == 'Pervasive', 'Dam_ProbUC'] = 0.189
+#
+#     # Add Foraging Probabilty Estimates
+#     geo_df['For_Prob'] = 0.001
+#     geo_df.loc[geo_df['BFI_cat'] == 'Low', 'For_Prob'] = 0.015
+#     geo_df.loc[geo_df['BFI_cat'] == 'Moderate', 'For_Prob'] = 0.02
+#     geo_df.loc[geo_df['BFI_cat'] == 'High', 'For_Prob'] = 0.021
+#     geo_df.loc[geo_df['BFI_cat'] == 'Preferred', 'For_Prob'] = 0.035
+#
+#     geo_df['For_ProbLC'] = 0.001
+#     geo_df.loc[geo_df['BFI_cat'] == 'Low', 'For_ProbLC'] = 0.014
+#     geo_df.loc[geo_df['BFI_cat'] == 'Moderate', 'For_ProbLC'] = 0.018
+#     geo_df.loc[geo_df['BFI_cat'] == 'High', 'For_ProbLC'] = 0.019
+#     geo_df.loc[geo_df['BFI_cat'] == 'Preferred', 'For_ProbLC'] = 0.033
+#
+#     geo_df['For_ProbUC'] = 0.001
+#     geo_df.loc[geo_df['BFI_cat'] == 'Low', 'For_ProbUC'] = 0.017
+#     geo_df.loc[geo_df['BFI_cat'] == 'Moderate', 'For_ProbUC'] = 0.022
+#     geo_df.loc[geo_df['BFI_cat'] == 'High', 'For_ProbUC'] = 0.024
+#     geo_df.loc[geo_df['BFI_cat'] == 'Preferred', 'For_ProbUC'] = 0.037
+#
+#     return geo_df
 
-    check_length = len(geo_df.index)
 
-    script_path = os.path.dirname(os.path.realpath(__file__))
-    zinb_preds_path = os.path.join(script_path, 'Data', 'ZINB_Predictions.csv')
-
-    zinb_pd = pd.read_csv(zinb_preds_path)
-    zinb_pd = zinb_pd.rename(columns={'n_dams_mod': 'Actual_BDC'})
-
-    geo_df['Actual_BDC'] = round((geo_df['BDC']/1000)*(geo_df['Length_m']), 3)*1000
-    geo_df = geo_df.astype({'Actual_BDC': 'int32'})
-    geo_df.loc[geo_df['Actual_BDC'] > 6000, 'Actual_BDC'] = 6000
-
-    zinb_pd['Actual_BDC'] = zinb_pd['Actual_BDC']*1000
-    zinb_pd = zinb_pd.astype({'Actual_BDC': 'int32'})
-    geo_df = geo_df.reset_index()
-
-    geo_df = geo_df.join(zinb_pd, on='Actual_BDC', how="left", rsuffix='_b')  # join dfs
-
-    geo_df = geo_df.rename(columns={"Est.1": "Est_nDam"})
-    geo_df = geo_df.rename(columns={"pLL": "Est_nDamLC"})
-    geo_df = geo_df.rename(columns={"pUL": "Est_nDamUC"})
-
-    if check_length!=len(geo_df.index):
-        warn('{0} NaN values have occurred in the predicted dam numbers merge. Check and fix!')
-
-    geo_df['Actual_BDC'] = geo_df['Actual_BDC']/1000  # convert back to Actual BDC for later calcs.
-
-    return geo_df
+# def predict_dam_nums(geo_df):
+#     """function to match Actual BDC values with those from the ZINB predicted values to estimate dam numbers"""
+#
+#     check_length = len(geo_df.index)
+#
+#     script_path = os.path.dirname(os.path.realpath(__file__))
+#     zinb_preds_path = os.path.join(script_path, 'Data', 'ZINB_Predictions.csv')
+#
+#     zinb_pd = pd.read_csv(zinb_preds_path)
+#     zinb_pd = zinb_pd.rename(columns={'n_dams_mod': 'Actual_BDC'})
+#
+#     geo_df['Actual_BDC'] = round((geo_df['BDC']/1000)*(geo_df['Length_m']), 3)*1000
+#     geo_df = geo_df.astype({'Actual_BDC': 'int32'})
+#     geo_df.loc[geo_df['Actual_BDC'] > 6000, 'Actual_BDC'] = 6000
+#
+#     zinb_pd['Actual_BDC'] = zinb_pd['Actual_BDC']*1000
+#     zinb_pd = zinb_pd.astype({'Actual_BDC': 'int32'})
+#     geo_df = geo_df.reset_index()
+#
+#     geo_df = geo_df.join(zinb_pd, on='Actual_BDC', how="left", rsuffix='_b')  # join dfs
+#
+#     geo_df = geo_df.rename(columns={"Est.1": "Est_nDam"})
+#     geo_df = geo_df.rename(columns={"pLL": "Est_nDamLC"})
+#     geo_df = geo_df.rename(columns={"pUL": "Est_nDamUC"})
+#
+#     if check_length!=len(geo_df.index):
+#         warn('{0} NaN values have occurred in the predicted dam numbers merge. Check and fix!')
+#
+#     geo_df['Actual_BDC'] = geo_df['Actual_BDC']/1000  # convert back to Actual BDC for later calcs.
+#
+#     return geo_df
 
 
 def poly_sumstat(riv_gdf, area_gdf):
@@ -286,7 +286,9 @@ def poly_sumstat(riv_gdf, area_gdf):
 
     dist_tot = riv_gdf['Length_m'].sum()
 
-    area_gdf['BDC_TOT'] = riv_gdf['Actual_BDC'].sum()
+    riv_gdf['Actual_BDC'] = (riv_gdf['BDC']/1000) * riv_gdf['Length_m']
+
+    area_gdf['BDC_TOT'] = riv_gdf['Actual_BDC'].sum()  #riv_gdf['Actual_BDC'].sum()
     area_gdf['BDC_W_AVG'] = riv_gdf['Actual_BDC'].sum()/(dist_tot/1000)
     area_gdf['BDC_MEAN'] = bdcmean = riv_gdf['BDC'].mean()
     area_gdf['BDC_MIN'] = riv_gdf['BDC'].min()
@@ -347,13 +349,13 @@ def poly_sumstat(riv_gdf, area_gdf):
 
 if __name__ == '__main__':
     """The call to the main function"""
-    path_root = os.path.abspath('D:/HG_Work/GB_Beaver_Data/ENGLAND_BDC_Out')
+    path_root = os.path.abspath('D:/HG_Work/GB_Beaver_Data/BeaverNetwork_GB_v2_0')
 
-    rbd_save_folder = os.path.abspath('D:/HG_Work/GB_Beaver_Data/ENGLAND_BDC_Tidy/BDC_RBD')
-    mcat_save_folder = os.path.abspath('D:/HG_Work/GB_Beaver_Data/ENGLAND_BDC_Tidy/BDC_ManCat')
-    opcat_save_folder = os.path.abspath('D:/HG_Work/GB_Beaver_Data/ENGLAND_BDC_Tidy/BDC_OpCat')
+    rbd_save_folder = os.path.abspath('D:/HG_Work/GB_Beaver_Data/BeaverNetwork_ENG/RBD_BeaverNetwork_Eng')
+    mcat_save_folder = os.path.abspath('D:/HG_Work/GB_Beaver_Data/BeaverNetwork_ENG/ManCat_BeaverNetwork_Eng')
+    opcat_save_folder = os.path.abspath('D:/HG_Work/GB_Beaver_Data/BeaverNetwork_ENG/OpCat_BeaverNetwork_Eng')
 
-    sumstat_root = os.path.abspath('D:/HG_Work/GB_Beaver_Data/ENGLAND_BDC_Tidy/Catch_SummStats')
+    sumstat_root = os.path.abspath('D:/HG_Work/GB_Beaver_Data/BeaverNetwork_ENG/SummStats_BeaverNetwork_Eng')
 
     rbd_RivBasDis = os.path.abspath('C:/HG_Projects/Hugh_BDC_Files/GB_Beaver_modelling/NE_OCs_MCs_Provided/RivBasDis/England_RBDs.gpkg')
     mancat_RivBasDis = os.path.abspath('C:/HG_Projects/Hugh_BDC_Files/GB_Beaver_modelling/NE_OCs_MCs_Provided/ManCat.shp')

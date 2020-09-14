@@ -1,4 +1,3 @@
-import sys
 import json
 import os
 import geopandas as gpd
@@ -9,6 +8,7 @@ from rasterio.mask import mask
 from rasterio.crs import CRS
 from shapely.geometry import box
 from datetime import datetime
+from tqdm import tqdm
 # from matplotlib import pyplot as plt
 
 
@@ -18,51 +18,44 @@ def BDC_setup_main(rivers_root, dem_path, bvi_etc_root, operCatch, epsg_code, ou
     os_gridPath = os.path.join(os.path.dirname(__file__), 'Data', 'OSGB_Grid_100km.gpkg')
 
     startTime = datetime.now()
-    print("running BDC setup script")
-    print("start time = {0}".format(startTime))
+    # print("running BDC setup script")
+    # print("start time = {0}".format(startTime))
 
     if os.path.exists(outRoot):
-        print("export folder already exists")
+        # print("export folder already exists")
+        pass
     else:
-        print("create export folder")
+        # print("create export folder")
         os.makedirs(outRoot)
 
     opCatch_gp = gpd.read_file(operCatch)
     opCatch_gp = opCatch_gp.to_crs(crs='epsg:{}'.format(epsg_code))
-    print(opCatch_gp.crs)
+    # print(opCatch_gp.crs)
 
 
     # A better way of handling indexes would be nice but for now you must add manually.
     if id_col is None:
         print("id column not provided - adding default id numbers")
         opCatch_gp['id'] = opCatch_gp.index + 1000
-        print("id column exists - continue")
+        # print("id column exists - continue")
     else:
         try:
             opCatch_gp['id'] = opCatch_gp[id_col] + 1000
         except KeyError as e:
-            raise Exception('Supplied ID column does not exist in geo data frame: {0}'.format(id_col))
+            raise KeyError('Supplied ID column does not exist in geo data frame: {0}'.format(id_col))
 
 
     id_listA = list(opCatch_gp['id'])
     id_list = [int(i) for i in id_listA]
-    for area in id_list:
+    for area in tqdm(id_list, desc='Dataset Preparation'):
 
         outFolder = os.path.join(outRoot, "Op_Catch_{0}".format(area))
         if os.path.exists(outFolder):
-            print("OS Grid folder already exists")
+            # print("OS Grid folder already exists")
+            pass
         else:
-            print("create OS Grid folder folder")
+            # print("create OS Grid folder folder")
             os.makedirs(outFolder)
-
-        # scratch = os.path.join(outFolder, 'scratch')
-        #
-        # if os.path.exists(scratch):
-        #     shutil.rmtree(scratch)
-        #     os.mkdir(scratch)
-        # else:
-        #     os.mkdir(scratch)
-
 
         opCatSelec = opCatch_gp[opCatch_gp.id == area]
         opCatSelec.crs = ('epsg:{}'.format(epsg_code))
@@ -82,20 +75,20 @@ def BDC_setup_main(rivers_root, dem_path, bvi_etc_root, operCatch, epsg_code, ou
 
 
 
-    print("script finished at {0}".format(datetime.now()))
-    print("Total Run Time = {0}".format(datetime.now() - startTime))
+    # print("script finished at {0}".format(datetime.now()))
+    # print("Total Run Time = {0}".format(datetime.now() - startTime))
 
 
 def get_extents(work_hyd_area, os_grid, epsg):
-    print("getting working extents for Op Catch hydrometic area")
+    # print("getting working extents for Op Catch hydrometic area")
 
     ordsurv_gp = gpd.read_file(os_grid)
     ordsurv_gp['GRIDSQ'] = ordsurv_gp['TILE_NAME']
     os_grids = gpd.overlay(ordsurv_gp, work_hyd_area, how='intersection')
-    print(os_grids)
+    # print(os_grids)
     grid_list = list(os_grids['GRIDSQ'])
 
-    print(grid_list)
+    # print(grid_list)
 
     minx, miny, maxx, maxy = work_hyd_area.geometry.total_bounds
     bbox = box(minx, miny, maxx, maxy)
@@ -112,7 +105,7 @@ def getFeatures(gdf):
 
 
 def get_rivs(riv_root, oc_shp, grid_list, outfold, hyd_num, epsg):
-    print("extracting detailed river network features with Op Catch")
+    # print("extracting detailed river network features with Op Catch")
 
     oc_area = oc_shp.loc[oc_shp.id == hyd_num].copy()
     oc_area = oc_area.reset_index()
@@ -124,18 +117,13 @@ def get_rivs(riv_root, oc_shp, grid_list, outfold, hyd_num, epsg):
         path = os.path.join(riv_root, grid.lower())
         shp_test = os.listdir(path)
         for x in shp_test:
-            # count += 1
             if x[-5:] == '.gpkg':
                 count += 1
                 shp_file = os.path.join(path, x)
                 riv_gpd = gpd.read_file(shp_file)
-                # temp_rivs = os.path.join(tempo_gdb, 'temp_rivs{0}'.format(count)
 
-                try:
-                    if oc_area.loc[0, 'geometry'].is_valid is False: # fixes catchment if geometery is invalid
-                        oc_area.loc[0, 'geometry'] = oc_area.loc[0, 'geometry'].buffer(0)
-                except Exception as e:
-                    print("BREAK")
+                if oc_area.loc[0, 'geometry'].is_valid is False: # fixes catchment if geometery is invalid
+                    oc_area.loc[0, 'geometry'] = oc_area.loc[0, 'geometry'].buffer(0)
 
                 rivs_clipped = clip(riv_gpd, oc_area)
 
@@ -144,7 +132,7 @@ def get_rivs(riv_root, oc_shp, grid_list, outfold, hyd_num, epsg):
 
     if len(river_list) > 1:
         # temp_rivs = os.path.join(tempo_gdb, 'temp_rivs')
-        print("merging clipped features")
+        # print("merging clipped features")
         riv_masked = gpd.GeoDataFrame(pd.concat(river_list, ignore_index=True))
 
         # riv_masked = pd.concat([
@@ -152,7 +140,7 @@ def get_rivs(riv_root, oc_shp, grid_list, outfold, hyd_num, epsg):
         #     for shp in river_list], sort=True).pipe(gpd.GeoDataFrame)
 
     else:
-        print("copying features")
+        # print("copying features")
 
         riv_masked = river_list[0]
 
@@ -176,7 +164,7 @@ def get_rivs(riv_root, oc_shp, grid_list, outfold, hyd_num, epsg):
 
 
 def get_inWatArea(root, oc_ha, epsg, grid_list, outfold, hyd_num):
-    print("extracting inland water area features within OC HA")
+    # print("extracting inland water area features within OC HA")
 
     water_list = []
 
@@ -205,7 +193,7 @@ def get_inWatArea(root, oc_ha, epsg, grid_list, outfold, hyd_num):
     inwaterB_gp.to_file(export_path, driver='GPKG')
 
 def get_bvi(root, epsg, coords, outfold, hyd_num, grid_list, work_hydAr):
-    print("extracting Beaver Veg. Index within Op Catch")
+    # print("extracting Beaver Veg. Index within Op Catch")
     # We need to add a condition - if len(gridlist) < 1 then no need to merge - skip to mask.
     bvi_list = []
 
@@ -219,7 +207,7 @@ def get_bvi(root, epsg, coords, outfold, hyd_num, grid_list, work_hydAr):
                 bvi_list.append(ras_file)
 
     if len(bvi_list) > 1:
-        print(">1 OS grid masking and merging rasters")
+        # print(">1 OS grid masking and merging rasters")
         src_files_to_mosaic = []
         mx, my, Mx, My = work_hydAr.geometry.total_bounds
         for fp in bvi_list:
@@ -229,11 +217,10 @@ def get_bvi(root, epsg, coords, outfold, hyd_num, grid_list, work_hydAr):
         mosaic, out_trans = merge(src_files_to_mosaic, bounds=[mx, my, Mx, My])
 
     elif len(bvi_list) == 0:
-        print("eh what's going on? looks like you've got no BVI to merge?")
-        sys.exit(1)
+        raise ValueError("eh what's going on? looks like you've got no BVI to merge?")
 
     else:
-        print("just one OS Grid - masking now")
+        # print("just one OS Grid - masking now")
         for fp in bvi_list:
             src = rasterio.open(fp)
             mosaic, out_trans = mask(dataset=src, shapes=coords, crop=True)
@@ -245,21 +232,16 @@ def get_bvi(root, epsg, coords, outfold, hyd_num, grid_list, work_hydAr):
         {"driver": "GTiff", "height": mosaic.shape[1], "width": mosaic.shape[2], "transform": out_trans,
          "crs": CRS.from_epsg(epsg), "compress": "lzw"})
 
-    print("exporting output raster")
+    # print("exporting output raster")
     out_ras = os.path.join(outfold, "OC{0}_BVI.tif".format(hyd_num))
     with rasterio.open(out_ras, "w", **out_meta) as dest:
         dest.write(mosaic)
 
-    out_img = None
-    mosaic = None
-    src = None
-
 
 def get_dem(dem_root,epsg, coords, outfold, hyd_num, grid_list, work_hydAr):
-    print("extracting DEM for Op Catch")
+    # print("extracting DEM for Op Catch")
 
     dtm_list = []
-
 
     for grid in grid_list:
         path = os.path.join(dem_root, grid.lower())
@@ -271,7 +253,7 @@ def get_dem(dem_root,epsg, coords, outfold, hyd_num, grid_list, work_hydAr):
 
     # src_files_to_mosaic = []
     if len(dtm_list) > 1:
-        print(">1 OS grid masking and merging rasters")
+        # print(">1 OS grid masking and merging rasters")
         mx, my, Mx, My = work_hydAr.geometry.total_bounds
         src_files_to_mosaic = []
         for fp in dtm_list:
@@ -281,10 +263,9 @@ def get_dem(dem_root,epsg, coords, outfold, hyd_num, grid_list, work_hydAr):
         mosaic, out_trans = merge(src_files_to_mosaic, bounds=[mx, my, Mx, My])
 
     elif len(dtm_list) == 0:
-        print("eh what's going on? looks like you've got no DTMs to merge?")
-        sys.exit(1)
+        raise ValueError("eh what's going on? looks like you've got no DTMs to merge?")
     else:
-        print("just one OS Grid - masking now")
+        # print("just one OS Grid - masking now")
         src = rasterio.open(dtm_list[0])
         mosaic, out_trans = mask(dataset=src, shapes=coords, crop=True)
 
@@ -295,7 +276,7 @@ def get_dem(dem_root,epsg, coords, outfold, hyd_num, grid_list, work_hydAr):
         {"driver": "GTiff", "height": mosaic.shape[1], "width": mosaic.shape[2], "transform": out_trans,
          "crs": CRS.from_epsg(epsg), "compress": "lzw"})
 
-    print("exporting output raster")
+    # print("exporting output raster")
     out_ras = os.path.join(outfold, "OC{0}_DTM.tif".format(hyd_num))
     with rasterio.open(out_ras, "w", **out_meta) as dest:
         dest.write(mosaic)
@@ -322,8 +303,8 @@ def clip(to_clip, clip_shp):
         crs=clip_shp.crs
     )
 
-    clip_gdf = gpd.sjoin(to_clip, union, op='intersects')  # previously 'within': caused deletion of tidal reaches
-
-    clip_gdf = clip_gdf.drop(columns=['index_right'])
+    # clip_gdf1 = gpd.sjoin(to_clip, union, op='within')  # previously 'within': caused deletion of tidal reaches
+    clip_gdf = gpd.overlay(to_clip, union, how="intersection")
+    # clip_gdf = clip_gdf.drop(columns=['index_right'])
 
     return clip_gdf

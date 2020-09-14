@@ -12,49 +12,46 @@ import shutil
 # import pandas as pd
 
 ############# START TIME ##############
-startTime = datetime.now()
+# startTime = datetime.now()
 
 
-def main(path, scratch_gdb, seg_network_a, DEM_orig, epsg):
+def main(path, scratch_gdb, seg_network_a, DEM_orig, epsg, osgeo_bat):
 
-    print(startTime)
+    # print(startTime)
 
     home_name = "BDC_OC{0}".format(path[-4:])  # REQUIRED - name of home working directory to be created
     # home = os.path.join(path, home_name)  # Don't Edit
     # outname = "Output_BDC_OC{0}.gpkg".format(path[-4:])  # REQUIRED - output file name
 
 
-    print("Run Stream Burn Process")
+    # print("Run Stream Burn Process")
 
     stream_burn_dem, net_raster, ras_meta, riv_gdf = streamBurning(DEM_orig, scratch_gdb, seg_network_a, path, home_name)
 
-    print("Run Flow Accumulation / Drainage area raster Process")
-    flowacc, strord_lines, grass_dir = run_grass(scratch_gdb, stream_burn_dem)
+    # print("Run Flow Accumulation / Drainage area raster Process")
+    flowacc, strord_lines, grass_dir = run_grass(scratch_gdb, stream_burn_dem, osgeo_bat)
 
     acc_to_contarea(DEM_orig, flowacc)
 
 
-    print("Run Stream Order Polygon Generation")
+    # print("Run Stream Order Polygon Generation")
 
     reaches_out = os.path.join(scratch_gdb, "seg_network_b.gpkg")
 
     if os.path.isfile(reaches_out):
-        print("stream ordering alredy done...")
+        pass
+        # print("stream ordering alredy done...")
 
     else:
         seg_net_gdf =join_str_order(riv_gdf, strord_lines)
         seg_net_gdf.crs = ('epsg:{}'.format(epsg))
         seg_net_gdf.to_file(reaches_out, driver='GPKG')
 
-    if os.path.isdir(grass_dir):
-        try:
-            shutil.rmtree(grass_dir)
-        except PermissionError as e:
-            print(e)
+    delete_grass_home(grass_dir)
 
-    finTime = datetime.now() - startTime
-    print("BDC Terrain completed. \n"
-          "Processing time = {0}".format(finTime))
+    # finTime = datetime.now() - startTime
+    # print("BDC Terrain completed. \n"
+    #       "Processing time = {0}".format(finTime))
 
     return reaches_out
 
@@ -63,7 +60,7 @@ def main(path, scratch_gdb, seg_network_a, DEM_orig, epsg):
 ################################################################################################
 
 def streamBurning(DEM_orig, scratch_gdb, seg_network_a, home, home_name):
-    print ("stream burning process")
+    # print ("stream burning process")
 
     riv_vec = gpd.read_file(seg_network_a)
 
@@ -97,20 +94,17 @@ def streamBurning(DEM_orig, scratch_gdb, seg_network_a, home, home_name):
 
     return sb_DEM, riv_ras, meta, riv_vec
 
-def run_grass(scratch_gdb, burn_dem):
-    print("set up to run terrain processing in GRASS GIS")
+def run_grass(scratch_gdb, burn_dem, osgeo_bat_p):
+    # print("set up to run terrain processing in GRASS GIS")
     scriptHome = os.path.dirname(__file__)
 
-    wrkdir = os.path.join(scriptHome, 'grass_processing')
-    if os.path.isdir(wrkdir):
-        try:
-            shutil.rmtree(wrkdir)
-        except PermissionError as e:
-            print(e)
+    wrkdir = os.path.join(scratch_gdb, 'grass_processing')
+
+    delete_grass_home(wrkdir)
 
     out_lines = os.path.join(scratch_gdb, "st_ord_line.gpkg")
     out_flwacc = os.path.join(scratch_gdb, "flwacc.tif")
-    command = os.path.abspath("C:/OSGeo4W64/OSGeo4W.bat")
+    command = os.path.abspath(osgeo_bat_p)
 
 
     init_script = os.path.join(scriptHome, 'grass_scripts', 'grass_initiate.bat')
@@ -122,12 +116,20 @@ def run_grass(scratch_gdb, burn_dem):
     # print(args)
     cmd = [command, init_script] + args
 
-    subprocess.call(cmd, universal_newlines=True)
+    subprocess.call(cmd, universal_newlines=True, stdin=subprocess.DEVNULL,
+                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
     return out_flwacc, out_lines, wrkdir
 
+def delete_grass_home(path):
+    if os.path.isdir(path):
+        try:
+            shutil.rmtree(path)
+        except PermissionError as e:
+            raise PermissionError('GRASS GIS directory might be in use??')
+
 def acc_to_contarea(DEM_orig, flwacc_path):
-    print("converting n cells to contributing area")
+    # print("converting n cells to contributing area")
 
     with rasterio.open(flwacc_path, 'r') as flw:
         flowacc = flw.read(1)
@@ -159,7 +161,7 @@ def join_str_order(streams_gdf, str_ord_lines):
 
     streams_so_join = gpd.sjoin(riv_centroids, so_gdf, how='left', op='intersects', lsuffix='left',
                              rsuffix='right')
-    print(streams_so_join)
+    # print(streams_so_join)
     streams_gdf['join_key'] = streams_gdf.index
     streams_so_join = streams_gdf.merge(streams_so_join, on='join_key', how='left')
 
