@@ -21,7 +21,7 @@ def main(root, save_folder, RivBasDis, Area_Def, save_BDC, sumstat_path, **kwarg
 
     if merged_bdc is None:
         print('collecting features...')
-        feature_list = glob(os.path.join(root, 'Op_Catch_*', 'BDC_OC*', 'Output_BDC_OC*.shp'))
+        feature_list = glob(os.path.join(root, 'Op_Catch_*', 'BDC_OC*', 'Output_BDC_OC*.gpkg'))
         Nat_bdc_gdf = concat_gdf_list(feature_list)
     else:
         print('user provided geodatafrmae...')
@@ -70,7 +70,7 @@ def main(root, save_folder, RivBasDis, Area_Def, save_BDC, sumstat_path, **kwarg
                  "Using generic catchment naming structure instead. ")
             rbd_name = 'Catchment_{0}'.format(idx)
 
-        rbd_fold_path = os.path.join(save_folder, rbd_name + '_BDC')
+        rbd_fold_path = os.path.join(save_folder, 'BeaverNetwork_' + rbd_name)
 
         if save_BDC is True:
             if os.path.isdir(rbd_fold_path):
@@ -78,7 +78,7 @@ def main(root, save_folder, RivBasDis, Area_Def, save_BDC, sumstat_path, **kwarg
             else:
                 os.mkdir(rbd_fold_path)
 
-            bdc_out_path = os.path.join(rbd_fold_path, rbd_name + '_BDC.shp')
+            bdc_out_path = os.path.join(rbd_fold_path, 'BeaverNetwork_' + rbd_name + '.shp')
             clip_bdc.to_file(bdc_out_path, driver="ESRI Shapefile")
 
 
@@ -286,7 +286,9 @@ def poly_sumstat(riv_gdf, area_gdf):
 
     dist_tot = riv_gdf['Length_m'].sum()
 
-    area_gdf['BDC_TOT'] = riv_gdf['Actual_BDC'].sum()
+    riv_gdf['Actual_BDC'] = (riv_gdf['BDC']/1000) * riv_gdf['Length_m']
+
+    area_gdf['BDC_TOT'] = riv_gdf['Actual_BDC'].sum()  #riv_gdf['Actual_BDC'].sum()
     area_gdf['BDC_W_AVG'] = riv_gdf['Actual_BDC'].sum()/(dist_tot/1000)
     area_gdf['BDC_MEAN'] = bdcmean = riv_gdf['BDC'].mean()
     area_gdf['BDC_MIN'] = riv_gdf['BDC'].min()
@@ -347,13 +349,13 @@ def poly_sumstat(riv_gdf, area_gdf):
 
 if __name__ == '__main__':
     """The call to the main function"""
-    path_root = os.path.abspath('D:/HG_Work/GB_Beaver_Data/ENGLAND_BDC_Out')
+    path_root = os.path.abspath('D:/HG_Work/GB_Beaver_Data/BeaverNetwork_GB_v2_0')
 
-    rbd_save_folder = os.path.abspath('D:/HG_Work/GB_Beaver_Data/ENGLAND_BDC_Tidy/BDC_RBD')
-    mcat_save_folder = os.path.abspath('D:/HG_Work/GB_Beaver_Data/ENGLAND_BDC_Tidy/BDC_ManCat')
-    opcat_save_folder = os.path.abspath('D:/HG_Work/GB_Beaver_Data/ENGLAND_BDC_Tidy/BDC_OpCat')
+    rbd_save_folder = os.path.abspath('D:/HG_Work/GB_Beaver_Data/BeaverNetwork_ENG/RBD_BeaverNetwork_Eng')
+    mcat_save_folder = os.path.abspath('D:/HG_Work/GB_Beaver_Data/BeaverNetwork_ENG/ManCat_BeaverNetwork_Eng')
+    opcat_save_folder = os.path.abspath('D:/HG_Work/GB_Beaver_Data/BeaverNetwork_ENG/OpCat_BeaverNetwork_Eng')
 
-    sumstat_root = os.path.abspath('D:/HG_Work/GB_Beaver_Data/ENGLAND_BDC_Tidy/Catch_SummStats')
+    sumstat_root = os.path.abspath('D:/HG_Work/GB_Beaver_Data/BeaverNetwork_ENG/SummStats_BeaverNetwork_Eng')
 
     rbd_RivBasDis = os.path.abspath('C:/HG_Projects/Hugh_BDC_Files/GB_Beaver_modelling/NE_OCs_MCs_Provided/RivBasDis/England_RBDs.gpkg')
     mancat_RivBasDis = os.path.abspath('C:/HG_Projects/Hugh_BDC_Files/GB_Beaver_modelling/NE_OCs_MCs_Provided/ManCat.shp')
